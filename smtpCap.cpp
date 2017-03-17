@@ -166,10 +166,30 @@ int send_data_to_server(list<mail_data_type>::iterator it)
 			__TRACE__("create thread failed\n");
 			return -1;
 		}
-		pthread_detach(tid);
+		pthread_detach(tid);  
 	}
 
 	return 0;
+}
+
+/***********************************************
+ * Summary:get a line from buf
+ * Param:
+ *		buf : src string
+ *		size : max length
+ *		ret : dest string
+ */
+void get_line(char *buf,size_t size,char* ret)
+{
+	char * src=buf;
+	char * dst=ret;
+	for(;(*src)!='\r'&&(*src)!='\n'&&size>0;++src)
+	{
+		*dst=*src;
+		++dst;
+		--size;
+	}
+	*dst='\0';
 }
 
 /************************************************************
@@ -181,12 +201,13 @@ int send_data_to_server(list<mail_data_type>::iterator it)
  ***********************************************************/
 void smtp_request_parser(list<mail_data_type>::iterator it,char * buf,size_t size)
 {
-	char * cur=buf;  //a pointer for parser
+	char * begin=buf;  //a pointer for parser
+	char * end=NULL;
 	char command[5];  //command have 4 characters
 	command[4]=0;  //"C" type string '\0'
 
 	memcpy(command,buf,4);
-	cur=buf+5;   //jump command(4)+1
+	begin=buf+5;   //jump command(4)+1
 
     if(it==g_mail_data_list.end())
 	{
@@ -196,6 +217,8 @@ void smtp_request_parser(list<mail_data_type>::iterator it,char * buf,size_t siz
 	if(strcmp(command,"EHLO")==0)
 	{
 		it->smtp_request_state=EHLO;
+		get_line(begin,128,it->hostname);
+		__TRACE__("hostname:%s\n",it->hostname);
 	}
 	else if(strcmp(command,"AUTH")==0)
 	{
@@ -330,7 +353,8 @@ void tcp_callback(struct tcp_stream * a_tcp,void ** this_time_not_needed)
 		}
 		if(a_tcp->server.count_new)
 		{
-			__TRACE__("send data:%s\n",a_tcp->server.data);
+			//__TRACE__("send data:%s\n",a_tcp->server.data);
+			__TRACE__("send data:\n");
 			smtp_request_parser(it,a_tcp->server.data,a_tcp->server.count_new);
 			return ;
 		}
@@ -341,7 +365,8 @@ void tcp_callback(struct tcp_stream * a_tcp,void ** this_time_not_needed)
 		}
 		if(a_tcp->client.count_new)
 		{
-			__TRACE__("received data:%s\n",a_tcp->client.data);	
+			__TRACE__("received data:\n");	
+		    //__TRACE__("received data:%s\n",a_tcp->client.data);	
 			smtp_reply_parser(it,a_tcp->server.data,a_tcp->server.count_new);
 			return ;
 		}
