@@ -1,15 +1,17 @@
-/*
+/************************************************
  *Author: ms
  *Date: 2017/3/11
  *Summary: capture and analyze SMTP protocol 
  *
- */
+ ***********************************************/
 
 #define __DEBUG__  //use __TRACE__ macro
 #include"Trace.h"
 
 #include"smtp_type.h"
 
+#include<pthread.h>
+#include<unistd.h>
 #include<sys/types.h>
 #include<sys/socket.h>
 #include<netinet/in.h>
@@ -85,7 +87,7 @@ int read_config_file()
 		fclose(fp);
 		return -1;
 	}
-
+	//read server port
 	memset(buf,0,64);
 	fscanf(fp,"%s",buf);
 	if(strncmp(buf,"server_port:",12)==0)
@@ -102,6 +104,47 @@ int read_config_file()
 	return 0;
 }
 
+/*********************************
+ * Summary: thread entry
+ * Param:
+ *		arg: is type of (mail_data_type*) ,pointer of sended data
+ *
+ * */
+void * thread_start(void * arg)
+{
+	mail_data_type* data= (mail_data_type*)arg;
+	
+	//sock conn
+	struct sockaddr_in server_address;
+	memset(&server_address,0,sizeof(server_address));
+	server_address.sin_family=AF_INET;
+	server_address.sin_addr.s_addr=g_config_info.server_ip;
+	server_address.sin_port=g_config_info.server_port;
+
+	int sock=socket(PF_INET,SOCK_STREAM,0);
+	if(sock<0)
+	{
+		exit(1);
+	}
+
+	if(connect(sock,(struct sockaddr *)&server_address,sizeof(server_address))<0)
+	{
+		__TRACE__("connection failed!\n");
+		close(sock);
+		exit(2);
+	}
+	
+	int ret=send(sock,data,sizeof(mail_data_type),0);
+	if(ret<=0)
+	{
+		close(sock);
+		exit(3);
+	}
+	__TRACE__("send success\n");
+
+	close(sock);
+}
+
 /**************************************************
  * Summary:send object to server
  * Param:
@@ -112,6 +155,20 @@ int read_config_file()
  *************************************************/
 int send_data_to_server(list<mail_data_type>::iterator it)
 {
+
+	int ret;
+	pthread_t tid;
+	if(it!=g_mail_data_list.end())
+	{
+		ret=pthread_create(&tid,NULL,thread_start,&(*it));
+		if(ret!=0)
+		{
+			__TRACE__("create thread failed\n");
+			return -1;
+		}
+		pthread_detach(tid);
+	}
+
 	return 0;
 }
 
@@ -177,6 +234,7 @@ void smtp_request_parser(list<mail_data_type>::iterator it,char * buf,size_t siz
 /**************************************************************
  *  Summary: analyze received smtp packet from buffer
  *  param:
+ *		it : list's iterator
  *		buf : buf from nids client data
  *		size : data's size
  ***************************************************************/
@@ -184,7 +242,7 @@ void smtp_reply_parser(list<mail_data_type>::iterator it,char * buf,size_t size)
 {
 }
 
-
+//call back function
 void tcp_callback(struct tcp_stream * a_tcp,void ** this_time_not_needed)
 {
 	char buf[1024];
@@ -242,6 +300,11 @@ void tcp_callback(struct tcp_stream * a_tcp,void ** this_time_not_needed)
     {
         __TRACE__( "%s reset\n", buf);
 
+	    a_tcp->client.collect--;
+	    a_tcp->server.collect--;
+	    a_tcp->server.collect_urg--;
+        a_tcp->client.collect_urg--;
+
 		//delete object from list
 		list<mail_data_type>::iterator it=find_element_from_list(a_tcp->addr.source);
 		g_mail_data_list.erase(it);
@@ -293,7 +356,7 @@ void tcp_callback(struct tcp_stream * a_tcp,void ** this_time_not_needed)
 int main()
 {
 
-	if(!read_config_file())
+	if(read_config_file())
 	{
 		return -1;
 	}
