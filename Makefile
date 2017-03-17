@@ -1,5 +1,5 @@
 NO_WARN=-Wall
-CC=gcc
+CC=g++
 
 DEBUG=-g
 
@@ -11,10 +11,10 @@ LIBS=$(NIDSLIB) $(NETLIB) $(PCAPLIB) -lnsl -lgthread-2.0
 
 all:smtpCap
 
-debug:smtpCap
+debug:smtpCap.cpp
 	$(CC) $(DEBUG) $(NO_WARN) -o smtpCap $^ $(LIBS)
 
-smtpCap:smtpCap.c
+smtpCap:smtpCap.cpp
 	$(CC) $(NO_WARN) -o $@ $^ $(LIBS)
 
 
