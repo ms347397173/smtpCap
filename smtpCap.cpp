@@ -10,6 +10,8 @@
 
 #include"smtp_type.h"
 
+#include"base64.h"  //use base64 decode
+
 #include<pthread.h>
 #include<unistd.h>
 #include<sys/types.h>

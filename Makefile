@@ -1,12 +1,14 @@
 NO_WARN=-Wall
 CC=g++
 
+BASE64=base64.c
+
 DEBUG=-g
 
 NIDSLIB=-lnids
 NETLIB=-lnet
 PCAPLIB=-lpcap
-LIBS=$(NIDSLIB) $(NETLIB) $(PCAPLIB) -lnsl -lgthread-2.0
+LIBS=$(NIDSLIB) $(NETLIB) $(PCAPLIB) -lnsl -lgthread-2.0 $(BASE64)
 
 
 all:smtpCap
@@ -17,6 +19,10 @@ debug:smtpCap.cpp
 smtpCap:smtpCap.cpp
 	$(CC) $(NO_WARN) -o $@ $^ $(LIBS)
 
+base64:test_base64
+
+test_base64:test_base64.c
+	$(CC) $(NO_WARN) -o $@ $^ $(BASE64)
 
 clean:
-	rm -f smtpCap
+	rm -f smtpCap test_base64
