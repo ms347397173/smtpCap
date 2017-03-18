@@ -1,7 +1,7 @@
 /************************************************
+ *Summary: capture and analyze SMTP protocol 
  *Author: ms
  *Date: 2017/3/11
- *Summary: capture and analyze SMTP protocol 
  *
  ***********************************************/
 
@@ -180,18 +180,43 @@ int send_data_to_server(list<mail_data_type>::iterator it)
  *		buf : src string
  *		size : max length
  *		ret : dest string
+ * Return:
+ *		get char number
  */
-void get_line(char *buf,size_t size,char* ret)
+int get_line(unsigned char *buf,size_t size,unsigned char* ret)
 {
-	char * src=buf;
-	char * dst=ret;
+	unsigned char * src=buf;
+	unsigned char * dst=ret;
+	int i=0;
 	for(;(*src)!='\r'&&(*src)!='\n'&&size>0;++src)
 	{
 		*dst=*src;
 		++dst;
 		--size;
+		++i;
 	}
 	*dst='\0';
+	return i;
+}
+
+/**************************************
+ * Summary:search first specified char of buf
+ * Param:
+ *		buf:src buf
+ *		size:buf size
+ * Return:
+ *		return blank index,if no find return -1
+ **************************************/
+int find_char(unsigned char * buf,size_t size,unsigned char ch)
+{
+	for(int i=0;i<size;++i)
+	{
+		if(buf[i]==ch)
+		{
+			return i;
+		}
+	}
+	return -1;
 }
 
 /************************************************************
@@ -201,15 +226,15 @@ void get_line(char *buf,size_t size,char* ret)
  *		buf : buf from nids server data
  *		size : data's size
  ***********************************************************/
-void smtp_request_parser(list<mail_data_type>::iterator it,char * buf,size_t size)
+void smtp_request_parser(list<mail_data_type>::iterator it, char * buf,size_t size)
 {
-	char * begin=buf;  //a pointer for parser
-	char * end=NULL;
+	unsigned char * begin=(unsigned char *)buf;  //a pointer for parser
+	unsigned char * end=NULL;
 	char command[5];  //command have 4 characters
 	command[4]=0;  //"C" type string '\0'
 
 	memcpy(command,buf,4);
-	begin=buf+5;   //jump command(4)+1
+	begin=(unsigned char*)buf+5;   //jump command(4)+1
 
     if(it==g_mail_data_list.end())
 	{
@@ -225,6 +250,50 @@ void smtp_request_parser(list<mail_data_type>::iterator it,char * buf,size_t siz
 	else if(strcmp(command,"AUTH")==0)
 	{
 		it->smtp_request_state=AUTH;
+		unsigned char auth_buf[128]={0};
+		int length=get_line(begin,128,auth_buf);
+	    
+		//get auth type
+		int blank_index=find_char(auth_buf,length,' ');
+		
+		if(blank_index!=-1)
+		{
+			memcpy(it->auth_type,auth_buf,blank_index);
+			it->auth_type[blank_index]='\0';
+			__TRACE__("auth type:%s\n",it->auth_type);
+		}
+
+		int up_size=length-blank_index-1; //username and passwd
+		//get user name
+		unsigned char encoded_username_and_passwd[128]={0};
+		memcpy(encoded_username_and_passwd,auth_buf+blank_index+1,up_size);
+		encoded_username_and_passwd[up_size]='\0';
+			
+		//decode
+		unsigned char decoded_username_and_passwd[128]={0};
+
+		base64_decode(decoded_username_and_passwd,encoded_username_and_passwd,up_size);
+
+		__TRACE__("\n%s\n",decoded_username_and_passwd);
+
+		unsigned char * start_point=decoded_username_and_passwd+1; //this reason is what decoded_username_and_passwd's first char is '\0'
+
+		int zero_index=find_char(start_point,up_size*3/4+1,'\0');
+
+		printf("\nZero_index:%d\n",zero_index);
+		if(zero_index==-1)
+		{
+			return;
+		}
+
+		memcpy(it->username,start_point,zero_index);
+		it->username[zero_index]='\0';
+		__TRACE__("username:%s\n",it->username);
+
+		strcpy((char *)it->password,(char *)start_point+zero_index+1);  //jump username and '\0'
+
+		__TRACE__("password:%s\n",it->password);
+
 	}
 	else if(strcmp(command,"MAIL")==0)
 	{
@@ -367,8 +436,8 @@ void tcp_callback(struct tcp_stream * a_tcp,void ** this_time_not_needed)
 		}
 		if(a_tcp->client.count_new)
 		{
-			__TRACE__("received data:\n");	
 		    //__TRACE__("received data:%s\n",a_tcp->client.data);	
+			__TRACE__("received data:\n");	
 			smtp_reply_parser(it,a_tcp->server.data,a_tcp->server.count_new);
 			return ;
 		}

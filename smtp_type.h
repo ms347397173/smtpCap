@@ -38,12 +38,12 @@ typedef struct mail_data_type
 	smtp_request_type smtp_request_state;
 
 	//EHLO
-	char hostname[128];
+	unsigned char hostname[128];
 	
 	//AUTH
-	char username[128];  
-	char password[128];
-	char auth_type[32];
+	unsigned char username[128];  
+	unsigned char password[128];
+	unsigned char auth_type[32];
 
 	//MAIL
 	char from[128];
