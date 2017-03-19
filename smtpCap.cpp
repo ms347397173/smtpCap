@@ -111,7 +111,7 @@ int read_config_file()
  * Param:
  *		arg: is type of (mail_data_type*) ,pointer of sended data
  *
- * */
+ *********************************/
 void * thread_start(void * arg)
 {
 	mail_data_type* data= (mail_data_type*)arg;
@@ -298,10 +298,37 @@ void smtp_request_parser(list<mail_data_type>::iterator it, char * buf,size_t si
 	else if(strcmp(command,"MAIL")==0)
 	{
 		it->smtp_request_state=MAIL;
+        
+		//get from
+		//jump "FROM:<"
+		begin+=6;
+		int char_index=find_char(begin,size-5-6,'>');
+		if(char_index==-1)
+		{
+			__TRACE__("SEARCH CHAR FAILED\n");
+			return ;
+		}
+		memcpy(it->from,begin,char_index);
+
+		__TRACE__("FROM:%s\n",it->from);
+
 	}
 	else if(strcmp(command,"RCPT")==0)
 	{
 		it->smtp_request_state=RCPT;
+
+		//get TO
+		//jump "To:<"
+		begin+=4;
+		int char_index=find_char(begin,size-5-4,'>');
+		if(char_index==-1)
+		{
+			__TRACE__("SEARCH CHAR FAILED\n");
+			return ;
+		}
+		memcpy(it->sendto[it->sendto_num++],begin,char_index);
+
+		__TRACE__("TO:%s\n",it->sendto[it->sendto_num-1]);
 	}
 	else if(strcmp(command,"DATA")==0)
 	{
@@ -360,7 +387,7 @@ void tcp_callback(struct tcp_stream * a_tcp,void ** this_time_not_needed)
 			//create a object in list recording source port
 			g_mail_data_list.resize(g_mail_data_list.size()+1);
 			g_mail_data_list.back().source_port=a_tcp->addr.source;
-			
+			g_mail_data_list.back().sendto_num=0;			
 		}
 		return ;
 	}
