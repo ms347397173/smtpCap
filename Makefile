@@ -2,13 +2,15 @@ NO_WARN=-Wall
 CC=g++
 
 BASE64=base64.c
+TEXTTOOLS=text_tools.c
+
 
 DEBUG=-g
 
 NIDSLIB=-lnids
 NETLIB=-lnet
 PCAPLIB=-lpcap
-LIBS=$(NIDSLIB) $(NETLIB) $(PCAPLIB) -lnsl -lgthread-2.0 $(BASE64)
+LIBS=$(NIDSLIB) $(NETLIB) $(PCAPLIB) -lnsl -lgthread-2.0 $(BASE64) $(TEXTTOOLS)
 
 
 all:smtpCap

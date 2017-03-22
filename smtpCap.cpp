@@ -3,7 +3,7 @@
  *Author: ms
  *Date: 2017/3/11
  *
- ***********************************************/
+ *************************************************/
 
 #define __DEBUG__  //use __TRACE__ macro
 #include"Trace.h"
@@ -11,6 +11,8 @@
 #include"smtp_type.h"
 
 #include"base64.h"  //use base64 decode
+
+#include"text_tools.h"  //use text tools function
 
 #include<pthread.h>
 #include<unistd.h>
@@ -40,13 +42,13 @@ char * adres (struct tuple4 addr)
    return buf;
 }
 
-/***************************************************
+/******************************************************************
  * Summary:find element from list
  * Param:
  *		source_port:local host port	
  *Return:
  *		return matched element's iterator ,no matched return end()
- *************************************************/
+ ******************************************************************/
 list<mail_data_type>::iterator find_element_from_list(unsigned short source_port)
 {
 	list<mail_data_type>::iterator it=g_mail_data_list.begin();
@@ -60,7 +62,7 @@ list<mail_data_type>::iterator find_element_from_list(unsigned short source_port
 	return it;
 }
 
-/***********************************************
+/************************************************
  *Summary:read smtpCap.config
  *Return:
  *		0:OK
@@ -106,12 +108,12 @@ int read_config_file()
 	return 0;
 }
 
-/*********************************
+/*****************************************************************
  * Summary: thread entry
  * Param:
  *		arg: is type of (mail_data_type*) ,pointer of sended data
  *
- *********************************/
+ *****************************************************************/
 void * thread_start(void * arg)
 {
 	mail_data_type* data= (mail_data_type*)arg;
@@ -174,50 +176,7 @@ int send_data_to_server(list<mail_data_type>::iterator it)
 	return 0;
 }
 
-/***********************************************
- * Summary:get a line from buf
- * Param:
- *		buf : src string
- *		size : max length
- *		ret : dest string
- * Return:
- *		get char number
- */
-int get_line(unsigned char *buf,size_t size,unsigned char* ret)
-{
-	unsigned char * src=buf;
-	unsigned char * dst=ret;
-	int i=0;
-	for(;(*src)!='\r'&&(*src)!='\n'&&size>0;++src)
-	{
-		*dst=*src;
-		++dst;
-		--size;
-		++i;
-	}
-	*dst='\0';
-	return i;
-}
 
-/**************************************
- * Summary:search first specified char of buf
- * Param:
- *		buf:src buf
- *		size:buf size
- * Return:
- *		return blank index,if no find return -1
- **************************************/
-int find_char(unsigned char * buf,size_t size,unsigned char ch)
-{
-	for(int i=0;i<size;++i)
-	{
-		if(buf[i]==ch)
-		{
-			return i;
-		}
-	}
-	return -1;
-}
 
 /************************************************************
  *  Summary: analyze sended smtp packet from buffer
@@ -333,6 +292,72 @@ void smtp_request_parser(list<mail_data_type>::iterator it, char * buf,size_t si
 	else if(strcmp(command,"DATA")==0)
 	{
 		it->smtp_request_state=DATA;
+
+		// no data can capture
+	}
+	//the next call the callback function,the state is enum"DATA"
+	else if(it->smtp_request_state==DATA)
+	{
+		////thie part need Refactoring,the repeated code is too more
+		////get subject
+		//char * subject_str="Subject: ";
+		//int index=strlen(subject_str);
+		//begin=(unsigned char*)buf;
+		//if(strncasecmp(buf,subject_str,strlen(subject_str))==0)
+		//{
+		//	index+=get_line(begin+index,size-index,it->subject);
+		//	index+=2;  //"\r\n"
+		//}
+
+		//__TRACE__("Subject:%s\n",it->subject);
+
+		////get date
+		//char * date_str="Date: ";
+
+		//char * date_index=strcasestr((char *)begin+index,"Date: ");
+		//begin=(unsigned char *)date_index;
+		//index=0;
+
+		//index+=strlen(date_str);
+		//index+=get_line(begin+index,size-index,it->date);
+		//index+=2;  //"\r\n"
+
+		//__TRACE__("Date:%s\n",it->date);
+		//
+		////get UA
+		//char * ua_str ="User-Agent: ";
+		//index+=strlen(ua_str);
+		//index+=get_line(begin+index,size-index,it->user_agent);	
+		//index+=2;  //"\r\n"
+
+		//	
+		//__TRACE__("user agent:%s\n",it->user_agent);
+
+		/////////////////////////////////////////////////////
+		//get subject
+		char * subject_str="Subject";
+		unsigned char* ret_str=read_info((unsigned char *)buf,size,(unsigned char*)subject_str,it->subject);
+		if(ret_str==NULL)
+		{
+			//if not get subject ,continue to receive next packet 
+			//set continue_receive;
+		
+		}
+		__TRACE__("subject:%s\n",it->subject);
+
+		char * date_str="Date";
+		ret_str=read_info((unsigned char *)buf,size,(unsigned char *)date_str,it->date);
+		if(ret_str)
+		{
+			__TRACE__("Date:%s\n",it->user_agent);
+		}
+		
+		char * ua_str="User-Agent";
+		ret_str=read_info((unsigned char *)buf,size,(unsigned char *)ua_str,it->user_agent);
+		if(ret_str)
+		{
+			__TRACE__("User-Agent:%s\n",it->user_agent);
+		}
 	}
 	else if(strcmp(command,"QUIT")==0)
 	{
