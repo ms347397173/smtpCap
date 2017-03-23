@@ -66,38 +66,57 @@ int find_char(unsigned char * buf,size_t size,unsigned char ch)
  **************************************************************************************************/
 unsigned char * read_info(unsigned char * buf,size_t size,unsigned char * key_str,__OUT_PARAM__ unsigned char * value_str)
 {
+	int chars=0;
+
+	unsigned char * ex_key_str=NULL;
+	char * str=NULL;
 	//begining of the buf,not \r\n
 	if(strncasecmp((char *)buf,(char *)key_str,strlen((char *)key_str))==0)
 	{
-		unsigned char * str=buf+strlen((char *)key_str)+2;
-		get_line(str,size-(str-buf),value_str);
-		return value_str;
+		str=(char *)buf+strlen((char *)key_str)+2;
+		chars=get_line((unsigned char *)str,size-(size_t)((unsigned char *)str-buf),value_str);
 	}
-
-	//not begining
-	int key_str_length=strlen((const char *)key_str)+1;
-	int ex_key_str_length=key_str_length+2;
-	unsigned char * ex_key_str=(unsigned char *)malloc(ex_key_str_length); //"\r\n[key_str]\0"
-	ex_key_str[0]='\r';
-	ex_key_str[1]='\n';
-	memcpy(ex_key_str+2,key_str,strlen((const char *)key_str));
-	ex_key_str[ex_key_str_length-1]='\0';
-
-	char * str=strcasestr((char *)buf,(char *)ex_key_str);
-	if(str==NULL)
+	else
 	{
+    	//not begining
+    	int key_str_length=strlen((const char *)key_str)+1;
+    	int ex_key_str_length=key_str_length+2;
+    	ex_key_str=(unsigned char *)malloc(ex_key_str_length); //"\r\n[key_str]\0"
+		memset(ex_key_str,0,ex_key_str_length);
+    	ex_key_str[0]='\r';
+    	ex_key_str[1]='\n';
+    	memcpy(ex_key_str+2,key_str,strlen((const char *)key_str));
+    	ex_key_str[ex_key_str_length-1]='\0';
+    
+    	str=strcasestr((char *)buf,(char *)ex_key_str);
+    	if(str==NULL)
+    	{
+    		free(ex_key_str);
+    		ex_key_str=NULL;
+    		return NULL;
+    	}
+    
+    	str+=key_str_length-1+2+2;  //has a space and ':' and '\r\n' 
+    	
+    	chars=get_line((unsigned char *)str,size-(size_t)((unsigned char *)str-buf),value_str);
+    
+		//free memory
 		free(ex_key_str);
 		ex_key_str=NULL;
-		return NULL;
 	}
-
-	str+=key_str_length+1;  //has a space and ':' ,so not -1
-	
-	get_line((unsigned char *)str,size-(size_t)((unsigned char *)str-buf),value_str);
-
-	//free memory
-	free(ex_key_str);
-	ex_key_str=NULL;
+	//if the next line not have filed , the line of the value_str 
+	//example: 
+	/**************************************************************
+	 *User-Agent: mozilla .....\r\n
+	 *thunderbird 1.2\r\n         //this line not have filed ,the line of the User-Agent
+	 *
+	 *
+	 * *************************************************************/
+	str=str+chars+2/*\r\n*/;
+	if(*str==' ')  //the begining of the line is space , the line of the up line
+	{
+		get_line((unsigned char *)str,size-(size_t)((unsigned char *)str-buf),value_str+chars);
+	}
 
 	return value_str;
 }

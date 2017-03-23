@@ -298,58 +298,19 @@ void smtp_request_parser(list<mail_data_type>::iterator it, char * buf,size_t si
 	//the next call the callback function,the state is enum"DATA"
 	else if(it->smtp_request_state==DATA)
 	{
-		////thie part need Refactoring,the repeated code is too more
-		////get subject
-		//char * subject_str="Subject: ";
-		//int index=strlen(subject_str);
-		//begin=(unsigned char*)buf;
-		//if(strncasecmp(buf,subject_str,strlen(subject_str))==0)
-		//{
-		//	index+=get_line(begin+index,size-index,it->subject);
-		//	index+=2;  //"\r\n"
-		//}
-
-		//__TRACE__("Subject:%s\n",it->subject);
-
-		////get date
-		//char * date_str="Date: ";
-
-		//char * date_index=strcasestr((char *)begin+index,"Date: ");
-		//begin=(unsigned char *)date_index;
-		//index=0;
-
-		//index+=strlen(date_str);
-		//index+=get_line(begin+index,size-index,it->date);
-		//index+=2;  //"\r\n"
-
-		//__TRACE__("Date:%s\n",it->date);
-		//
-		////get UA
-		//char * ua_str ="User-Agent: ";
-		//index+=strlen(ua_str);
-		//index+=get_line(begin+index,size-index,it->user_agent);	
-		//index+=2;  //"\r\n"
-
-		//	
-		//__TRACE__("user agent:%s\n",it->user_agent);
-
-		/////////////////////////////////////////////////////
 		//get subject
 		char * subject_str="Subject";
 		unsigned char* ret_str=read_info((unsigned char *)buf,size,(unsigned char*)subject_str,it->subject);
-		if(ret_str==NULL)
+		if(ret_str)
 		{
-			//if not get subject ,continue to receive next packet 
-			//set continue_receive;
-		
+			__TRACE__("Subject:%s\n",it->subject);
 		}
-		__TRACE__("subject:%s\n",it->subject);
 
 		char * date_str="Date";
 		ret_str=read_info((unsigned char *)buf,size,(unsigned char *)date_str,it->date);
 		if(ret_str)
 		{
-			__TRACE__("Date:%s\n",it->user_agent);
+			__TRACE__("Date:%s\n",it->date);
 		}
 		
 		char * ua_str="User-Agent";
@@ -358,6 +319,15 @@ void smtp_request_parser(list<mail_data_type>::iterator it, char * buf,size_t si
 		{
 			__TRACE__("User-Agent:%s\n",it->user_agent);
 		}
+
+		//get mail content
+		
+		//search boundary
+
+
+
+
+		//get mail attachment name
 	}
 	else if(strcmp(command,"QUIT")==0)
 	{
