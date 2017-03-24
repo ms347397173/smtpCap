@@ -115,8 +115,47 @@ unsigned char * read_info(unsigned char * buf,size_t size,unsigned char * key_st
 	str=str+chars+2/*\r\n*/;
 	if(*str==' ')  //the begining of the line is space , the line of the up line
 	{
-		get_line((unsigned char *)str,size-(size_t)((unsigned char *)str-buf),value_str+chars);
+		chars=get_line((unsigned char *)str,size-(size_t)((unsigned char *)str-buf),value_str+chars);
+		str=str+chars+2/*\r\n*/;
 	}
 
-	return value_str;
+	return (unsigned char *)str;   //return the next line
+}
+
+
+/*************************************************
+ * Summary: jump all fllowing field to get content
+ * Param:
+ *		buf:src string
+ * Return: 
+ *		the chars no exist every filed
+ **************************************************/
+
+char * jump_all_field(char * buf)
+{
+	char tmp[1024];
+	char * src=buf;
+	int chars;
+	int index;
+	while(1)
+	{
+	    chars=get_line((unsigned char *)src,1024,(unsigned char *)tmp);
+	    index=find_char((unsigned char *)tmp,strlen(tmp),':');
+	    if(index!=-1 && index!=0 && index!=(strlen(tmp)-1))
+	    {
+	    	if(*(src+chars+2)==' ')
+	    	{
+	    		src=src+chars+2+1;
+	    		chars=get_line((unsigned char *)src,1024,(unsigned char *)tmp);
+	    	}
+			
+	    }
+		else
+		{
+			break;
+		}
+		src=src+chars+2;
+    }
+
+	return src;
 }

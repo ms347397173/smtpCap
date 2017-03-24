@@ -320,10 +320,110 @@ void smtp_request_parser(list<mail_data_type>::iterator it, char * buf,size_t si
 			__TRACE__("User-Agent:%s\n",it->user_agent);
 		}
 
-		//get mail content
-		
-		//search boundary
 
+		//the follow code need refactor to a function  ***
+
+		//get mail content	,search first "Content-Type" field
+		char * content_type_str="Content-Type";
+		char * boundary_str="boundary";   //boundary="...."
+		unsigned char content_type_data[128];
+		unsigned char  boundary_data[128];
+		char * boundary_index=NULL;
+	
+		//ret_str will jump boundary
+		ret_str=read_info((unsigned char *)buf,size,(unsigned char *)content_type_str,content_type_data);
+		
+		if(ret_str)
+		{
+			boundary_index=strcasestr((char *)content_type_data,boundary_str);
+			if(boundary_index)
+			{
+				//get boundary
+				boundary_index+=strlen("boundary=\"");
+				int chars=find_char((unsigned char *)boundary_index,128-(int)((unsigned char *)boundary_index-content_type_data),(unsigned char)'\"');
+				if(chars!=-1)
+				{	
+					memcpy(boundary_data,boundary_index,chars);
+					boundary_data[chars]='\0';
+				}
+				else
+				{
+					return;
+				}
+
+				//construct boundary string
+				unsigned char boundary[128];
+				memset(boundary,0,sizeof(boundary));
+				boundary[0]='-';
+				boundary[1]='-';
+				memcpy(boundary+2,boundary_data,strlen((const char *)boundary_data));
+				__TRACE__("boundary:%s\n",boundary);
+
+				int boundary_length=strlen((const char *)boundary);  //get length
+
+				//search first boundary that the Content-Type is text
+				//
+
+				char * boundary_start=strstr((char *)ret_str,(char *)boundary);
+				if(boundary_start==NULL)
+				{
+					return;
+				}
+
+				//jump boundary
+				boundary_start+=(boundary_length+strlen("\r\n"));
+
+
+				printf("\nboundary_start:%s\n",boundary_start);
+				//jump all field
+				char * content_start=jump_all_field(boundary_start);
+
+				__TRACE__("content-start:%s\n",content_start);
+
+				//get content
+				int position=0;
+				unsigned char tmp[1024];
+
+				char end_boundary[1024];
+				memset(end_boundary,0,1024);
+				memcpy(end_boundary,boundary,boundary_length);
+				end_boundary[boundary_length]='-';
+				end_boundary[boundary_length+1]='-';
+
+				while(1)
+				{
+					memset(tmp,0,1024);
+
+					int chars=get_line((unsigned char*)content_start+position,size-(content_start-buf),tmp);
+					if(strncasecmp((char *)tmp,(char *)boundary,boundary_length)==0)  //to end
+					{
+						break;
+					}	
+					if(strncasecmp((char *)tmp,(char *)end_boundary,boundary_length+2)==0)  //to end
+					{
+						break;
+					}
+					memcpy(it->main_body+position,tmp,chars);
+					position+=chars;
+					memcpy(it->main_body+position,"\r\n",2);
+					position+=2;
+
+				}
+
+
+
+			}
+			else  //not boundary
+			{
+				//jump all field
+
+				//get content
+			}
+			__TRACE__("main_body:%s\n",it->main_body);
+
+		}
+
+		
 
 
 
