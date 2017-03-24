@@ -322,7 +322,7 @@ void smtp_request_parser(list<mail_data_type>::iterator it, char * buf,size_t si
 
 
 		//the follow code need refactor to a function  ***
-
+        //--***-------------***---------------***----------refactor---------***----------------------***--------------------------
 		//get mail content	,search first "Content-Type" field
 		char * content_type_str="Content-Type";
 		char * boundary_str="boundary";   //boundary="...."
@@ -362,8 +362,6 @@ void smtp_request_parser(list<mail_data_type>::iterator it, char * buf,size_t si
 				int boundary_length=strlen((const char *)boundary);  //get length
 
 				//search first boundary that the Content-Type is text
-				//
-
 				char * boundary_start=strstr((char *)ret_str,(char *)boundary);
 				if(boundary_start==NULL)
 				{
@@ -373,15 +371,10 @@ void smtp_request_parser(list<mail_data_type>::iterator it, char * buf,size_t si
 				//jump boundary
 				boundary_start+=(boundary_length+strlen("\r\n"));
 
-
-				printf("\nboundary_start:%s\n",boundary_start);
 				//jump all field
 				char * content_start=jump_all_field(boundary_start);
 
-				__TRACE__("content-start:%s\n",content_start);
-
 				//get content
-				int position=0;
 				unsigned char tmp[1024];
 
 				char end_boundary[1024];
@@ -394,7 +387,7 @@ void smtp_request_parser(list<mail_data_type>::iterator it, char * buf,size_t si
 				{
 					memset(tmp,0,1024);
 
-					int chars=get_line((unsigned char*)content_start+position,size-(content_start-buf),tmp);
+					int chars=get_line((unsigned char*)content_start+it->main_body_num,size-(content_start-buf),tmp);
 					if(strncasecmp((char *)tmp,(char *)boundary,boundary_length)==0)  //to end
 					{
 						break;
@@ -403,19 +396,26 @@ void smtp_request_parser(list<mail_data_type>::iterator it, char * buf,size_t si
 					{
 						break;
 					}
-					memcpy(it->main_body+position,tmp,chars);
-					position+=chars;
-					memcpy(it->main_body+position,"\r\n",2);
-					position+=2;
+					memcpy(it->main_body+it->main_body_num,tmp,chars);
+					it->main_body_num+=chars;
+					memcpy(it->main_body+it->main_body_num,"\r\n",2);
+					it->main_body_num+=2;
 
 				}
-
-
-
 			}
 			else  //not boundary
 			{
 				//jump all field
+				//
+				char *content_data=jump_all_field((char *)ret_str);
+				char *end_pos=strstr(content_data,".\r\n");
+				if(end_pos==NULL)
+				{
+					return;
+				}
+				int length=end_pos-content_data;
+				memcpy(it->main_body+it->main_body_num,content_data,length);
+				it->main_body_num+=length;
 
 				//get content
 			}
@@ -423,9 +423,10 @@ void smtp_request_parser(list<mail_data_type>::iterator it, char * buf,size_t si
 
 		}
 
-		
 
+		//------***------------------***------------end_refactor-------***---------------------***--------------------------
 
+	
 
 		//get mail attachment name
 	}
@@ -482,7 +483,8 @@ void tcp_callback(struct tcp_stream * a_tcp,void ** this_time_not_needed)
 			//create a object in list recording source port
 			g_mail_data_list.resize(g_mail_data_list.size()+1);
 			g_mail_data_list.back().source_port=a_tcp->addr.source;
-			g_mail_data_list.back().sendto_num=0;			
+			g_mail_data_list.back().sendto_num=0;
+			g_mail_data_list.back().main_body_num=0;
 		}
 		return ;
 	}
@@ -547,7 +549,7 @@ void tcp_callback(struct tcp_stream * a_tcp,void ** this_time_not_needed)
 		if(a_tcp->server.count_new)
 		{
 			//__TRACE__("send data:%s\n",a_tcp->server.data);
-			__TRACE__("send data:\n");
+			__TRACE__("send data:%dbyte\n",a_tcp->server.count_new);
 			smtp_request_parser(it,a_tcp->server.data,a_tcp->server.count_new);
 			return ;
 		}
@@ -560,7 +562,7 @@ void tcp_callback(struct tcp_stream * a_tcp,void ** this_time_not_needed)
 		{
 		    //__TRACE__("received data:%s\n",a_tcp->client.data);	
 			__TRACE__("received data:\n");	
-			smtp_reply_parser(it,a_tcp->server.data,a_tcp->server.count_new);
+			smtp_reply_parser(it,a_tcp->server.data,a_tcp->client.count_new);
 			return ;
 		}
 

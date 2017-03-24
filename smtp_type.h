@@ -49,15 +49,17 @@ typedef struct mail_data_type
 	unsigned char from[128];
 
 	//RCPT
-	int sendto_num;
 	unsigned char sendto[32][128];  //no greater than 32 user
 	
+	int sendto_num; //<=32
 	//DATA
 	unsigned char subject[1024];
 	unsigned char date[64];
 	unsigned char user_agent[64];
-	unsigned char main_body[65535];   //the content isn't base64 code ,is being decoded
-	unsigned char attachment_name[16][128];  
+	unsigned char main_body[65536];   //the content isn't base64 code ,is being decoded
+	int main_body_num;  //<=65535
+	unsigned char attachment_name[16][128]; 
+	int attachment_num;  //<=16
 
 }mail_data_type;
 

@@ -70,6 +70,13 @@ unsigned char * read_info(unsigned char * buf,size_t size,unsigned char * key_st
 
 	unsigned char * ex_key_str=NULL;
 	char * str=NULL;
+
+
+	if(size<strlen((char*)key_str))
+	{
+		return NULL;
+	}
+
 	//begining of the buf,not \r\n
 	if(strncasecmp((char *)buf,(char *)key_str,strlen((char *)key_str))==0)
 	{
