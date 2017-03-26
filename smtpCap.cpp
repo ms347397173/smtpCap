@@ -176,7 +176,197 @@ int send_data_to_server(list<mail_data_type>::iterator it)
 	return 0;
 }
 
+char * read_a_boundary(list<mail_data_type>::iterator it,char * buf,size_t size,char * boundary)
+{
 
+	unsigned char tmp[1024];
+	int boundary_length=strlen(boundary);
+	char end_boundary[1024];
+	memset(end_boundary,0,1024);
+	memcpy(end_boundary,boundary,boundary_length);
+	end_boundary[boundary_length]='-';
+	end_boundary[boundary_length+1]='-';
+	while(1)
+	{
+		memset(tmp,0,1024);
+
+		int chars=get_line((unsigned char*)buf+it->main_body_num,size-it->main_body_num,tmp);
+		if(chars==-1)
+		{
+			return NULL;
+		}
+		if(strncasecmp((char *)tmp,(char *)boundary,boundary_length)==0)  //to end
+		{
+			break;
+		}	
+		if(strncasecmp((char *)tmp,(char *)end_boundary,boundary_length+2)==0)  //to end
+		{
+			break;
+		}
+		memcpy(it->main_body+it->main_body_num,tmp,chars);
+		it->main_body_num+=chars;
+		memcpy(it->main_body+it->main_body_num,"\r\n",2);
+		it->main_body_num+=2;
+
+	}
+	return buf+it->main_body_num;
+}
+
+/****************************************************************
+ * Summary: get content data
+ * Param:
+ *		it:which tcp link
+ *		buf:src data str
+ *		size: buf's size
+ * 
+ *
+ *****************************************************************/
+void content_parser(list<mail_data_type>::iterator it,char * buf,size_t size)
+{
+	//the follow code need refactor to a function  ***
+	//--***-------------***---------------***----------refactor---------***----------------------***--------------------------
+	//get mail content	,search first "Content-Type" field
+	char * boundary_str="boundary";   //boundary="...."
+	unsigned char content_type_data[128];
+	unsigned char  boundary_data[128];
+	char * boundary_index=NULL;
+
+	if(buf==NULL)
+	{
+		return;
+	}
+	
+	char * content_type_str="Content-Type";
+	//ret_str will jump boundary
+	unsigned char *ret_str=read_info((unsigned char *)buf,size,(unsigned char *)content_type_str,content_type_data);
+	
+	if(ret_str)   //have content-type
+	{
+		boundary_index=strcasestr((char *)content_type_data,boundary_str);
+		if(boundary_index)  //have boundary
+		{
+			//get boundary
+			boundary_index+=strlen("boundary=\"");
+			int chars=find_char((unsigned char *)boundary_index,128-(int)((unsigned char *)boundary_index-content_type_data),(unsigned char)'\"');
+			if(chars!=-1)
+			{	
+				memcpy(boundary_data,boundary_index,chars);
+				boundary_data[chars]='\0';
+			}
+			else
+			{
+				return;
+			}
+
+			//construct boundary string
+			unsigned char boundary[128];
+			memset(boundary,0,sizeof(boundary));
+			boundary[0]='-';
+			boundary[1]='-';
+			memcpy(boundary+2,boundary_data,strlen((const char *)boundary_data));
+			__TRACE__("boundary:%s\n",boundary);
+
+			int boundary_length=strlen((const char *)boundary);  //get length
+
+			char * altenative_str="multipart/alternative";
+			int alte_str_length=strlen(altenative_str);
+
+			char * boundary_start=strstr((char *)ret_str,(char *)boundary);
+			if(boundary_start==NULL)
+			{
+				return;
+			}
+
+			//if the content type is multipart/alternative ,then read a boundary 
+			if(strncasecmp((char *)content_type_data,altenative_str,alte_str_length)==0)
+			{
+				//jump boundary\r\n
+				boundary_start+=(boundary_length+strlen("\r\n"));
+				char * content_start=jump_all_field(boundary_start);
+				read_a_boundary(it,(char *)content_start,(size)-((char *)content_start-buf),(char *)boundary);
+			}
+			//else read all boundary 
+			else
+			{
+				char * ret=boundary_start;
+				while(ret!=NULL)
+				{
+
+					ret=strcasestr(ret,(char *)boundary);
+					if(ret==NULL)
+					{
+						break;
+					}
+					ret+=(boundary_length+strlen("\r\n"));
+					ret=jump_all_field(ret);
+					ret=read_a_boundary(it,ret,(size)-(ret-buf),(char *)boundary);
+				}
+
+			}
+
+
+		}
+		else  //not boundary, this logic is correct,no modify
+		{
+			//jump all field
+			//
+			char *content_data=jump_all_field((char *)ret_str);
+			char *end_pos=strstr(content_data,".\r\n");
+			if(end_pos==NULL)
+			{
+				return;
+			}
+			int length=end_pos-content_data;
+			memcpy(it->main_body+it->main_body_num,content_data,length);
+			it->main_body_num+=length;
+
+			//get content
+		}
+		__TRACE__("main_body:%s\n",it->main_body);
+
+	}
+
+
+	//------***------------------***------------end_refactor-------***---------------------***--------------------------
+
+	//get mail attachment name
+	char * content_disposition_str="Content-Disposition";
+	char * attachment_str="attachment; filename=\"";
+	int attachment_str_length=strlen(attachment_str);
+	unsigned char attachment[256]={0};
+	
+	ret_str=(unsigned char *)buf;
+
+	while(1)
+	{
+	    ret_str=read_info((unsigned char *)ret_str,size-(ret_str-(unsigned char *)buf),(unsigned char *)content_disposition_str,attachment);
+	
+
+		//no found ,break
+	    if(!ret_str)
+		{
+			break;
+		}
+	    
+	    printf("\nattachment:%s\n",attachment);
+	    //if == attachment
+	    if(strncasecmp((char *)attachment,attachment_str,strlen(attachment_str)-1)==0)
+	    {
+	    	//jump ":\r\n " 4chars 
+	    	unsigned char * position=attachment+attachment_str_length;
+	    	int index=find_char(position,strlen((char *) position),'\"');
+	    	if(index==-1)
+	    	{
+	    		return ;
+	    	}
+
+	    	memcpy(it->attachment_name[it->attachment_num++],position,index);
+	    	__TRACE__("Attachment:%s\n",it->attachment_name[it->attachment_num-1]);
+	    }
+	    
+		
+	}
+}
 
 /************************************************************
  *  Summary: analyze sended smtp packet from buffer
@@ -298,6 +488,8 @@ void smtp_request_parser(list<mail_data_type>::iterator it, char * buf,size_t si
 	//the next call the callback function,the state is enum"DATA"
 	else if(it->smtp_request_state==DATA)
 	{
+
+
 		//get subject
 		char * subject_str="Subject";
 		unsigned char* ret_str=read_info((unsigned char *)buf,size,(unsigned char*)subject_str,it->subject);
@@ -320,115 +512,10 @@ void smtp_request_parser(list<mail_data_type>::iterator it, char * buf,size_t si
 			__TRACE__("User-Agent:%s\n",it->user_agent);
 		}
 
-
-		//the follow code need refactor to a function  ***
-        //--***-------------***---------------***----------refactor---------***----------------------***--------------------------
-		//get mail content	,search first "Content-Type" field
-		char * content_type_str="Content-Type";
-		char * boundary_str="boundary";   //boundary="...."
-		unsigned char content_type_data[128];
-		unsigned char  boundary_data[128];
-		char * boundary_index=NULL;
-	
-		//ret_str will jump boundary
-		ret_str=read_info((unsigned char *)buf,size,(unsigned char *)content_type_str,content_type_data);
 		
-		if(ret_str)
-		{
-			boundary_index=strcasestr((char *)content_type_data,boundary_str);
-			if(boundary_index)
-			{
-				//get boundary
-				boundary_index+=strlen("boundary=\"");
-				int chars=find_char((unsigned char *)boundary_index,128-(int)((unsigned char *)boundary_index-content_type_data),(unsigned char)'\"');
-				if(chars!=-1)
-				{	
-					memcpy(boundary_data,boundary_index,chars);
-					boundary_data[chars]='\0';
-				}
-				else
-				{
-					return;
-				}
+		//get content
+		content_parser(it,(char *)buf,size);
 
-				//construct boundary string
-				unsigned char boundary[128];
-				memset(boundary,0,sizeof(boundary));
-				boundary[0]='-';
-				boundary[1]='-';
-				memcpy(boundary+2,boundary_data,strlen((const char *)boundary_data));
-				__TRACE__("boundary:%s\n",boundary);
-
-				int boundary_length=strlen((const char *)boundary);  //get length
-
-				//search first boundary that the Content-Type is text
-				char * boundary_start=strstr((char *)ret_str,(char *)boundary);
-				if(boundary_start==NULL)
-				{
-					return;
-				}
-
-				//jump boundary
-				boundary_start+=(boundary_length+strlen("\r\n"));
-
-				//jump all field
-				char * content_start=jump_all_field(boundary_start);
-
-				//get content
-				unsigned char tmp[1024];
-
-				char end_boundary[1024];
-				memset(end_boundary,0,1024);
-				memcpy(end_boundary,boundary,boundary_length);
-				end_boundary[boundary_length]='-';
-				end_boundary[boundary_length+1]='-';
-
-				while(1)
-				{
-					memset(tmp,0,1024);
-
-					int chars=get_line((unsigned char*)content_start+it->main_body_num,size-(content_start-buf),tmp);
-					if(strncasecmp((char *)tmp,(char *)boundary,boundary_length)==0)  //to end
-					{
-						break;
-					}	
-					if(strncasecmp((char *)tmp,(char *)end_boundary,boundary_length+2)==0)  //to end
-					{
-						break;
-					}
-					memcpy(it->main_body+it->main_body_num,tmp,chars);
-					it->main_body_num+=chars;
-					memcpy(it->main_body+it->main_body_num,"\r\n",2);
-					it->main_body_num+=2;
-
-				}
-			}
-			else  //not boundary
-			{
-				//jump all field
-				//
-				char *content_data=jump_all_field((char *)ret_str);
-				char *end_pos=strstr(content_data,".\r\n");
-				if(end_pos==NULL)
-				{
-					return;
-				}
-				int length=end_pos-content_data;
-				memcpy(it->main_body+it->main_body_num,content_data,length);
-				it->main_body_num+=length;
-
-				//get content
-			}
-			__TRACE__("main_body:%s\n",it->main_body);
-
-		}
-
-
-		//------***------------------***------------end_refactor-------***---------------------***--------------------------
-
-	
-
-		//get mail attachment name
 	}
 	else if(strcmp(command,"QUIT")==0)
 	{

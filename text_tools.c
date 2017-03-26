@@ -14,15 +14,22 @@
  * Return:
  *		get char number
  ************************************************/
-int get_line(unsigned char *buf,size_t size,unsigned char* ret)
+int get_line(unsigned char *buf,size_t size,__OUT_PARAM__ unsigned char* ret)
 {
 	unsigned char * src=buf;
 	unsigned char * dst=ret;
 	int i=0;
 
+	if(size==0)
+	{
+		return -1;
+	}
+
 	//jump initial \r & \n
 	for(;(*src)=='\r'||(*src)=='\n';++src)
-	{}
+	{
+		--size;
+	}
 	
 	//copy
 	for(;(*src)!='\r'&&(*src)!='\n'&&size>0;++src)
