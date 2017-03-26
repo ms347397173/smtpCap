@@ -29,54 +29,194 @@ using namespace std;
 
 //funciton statement
 int read_config_file();
-
+void content_parser(list<mail_data_type>::iterator it,char * buf,size_t size);
 
 //global vars
 list<mail_data_type> g_mail_data_list;
 config_info_type g_config_info;
-void (*smtp_request_tables[11])(list<mail_data_type>::iterator,unsigned char *);   //smtp request parser function tables
 
-void (*DATA_tables[5])(list<mail_data_type>::iterator,unsigned char *);  //DATA parser funciton tables
+#define SMTP_REQUEST_TABLES_SIZE (11)
+void (*smtp_request_tables[SMTP_REQUEST_TABLES_SIZE])(list<mail_data_type>::iterator,unsigned char *,size_t);   //smtp request parser function tables
+
+#define DATA_TABLES_SIZE (6)
+void (*DATA_tables[DATA_TABLES_SIZE])(list<mail_data_type>::iterator,unsigned char *,size_t);  //DATA parser funciton tables
 
 /*smtp request tables function*/
-void ehlo_parser(list<mail_data_type>::iterator it,unsigned char * buf)
+void ehlo_parser(list<mail_data_type>::iterator it,unsigned char * buf,size_t size)
+{
+	get_line(buf,size,it->hostname);
+	__TRACE__("hostname:%s\n",it->hostname);
+}
+
+//the function process auth:plain 
+void auth_parser(list<mail_data_type>::iterator it,unsigned char * buf,size_t size)
+{
+	unsigned char auth_buf[128]={0};
+	int length=get_line(buf,size,auth_buf);
+	
+	//get auth type
+	int blank_index=find_char(auth_buf,length,' ');
+	
+	if(blank_index!=-1)
+	{
+		memcpy(it->auth_type,auth_buf,blank_index);
+		it->auth_type[blank_index]='\0';
+		__TRACE__("auth type:%s\n",it->auth_type);
+	}
+
+	int up_size=length-blank_index-1; //username and passwd
+	//get user name
+	unsigned char encoded_username_and_passwd[128]={0};
+	memcpy(encoded_username_and_passwd,auth_buf+blank_index+1,up_size);
+	encoded_username_and_passwd[up_size]='\0';
+		
+	//decode
+	unsigned char decoded_username_and_passwd[128]={0};
+
+	base64_decode(decoded_username_and_passwd,encoded_username_and_passwd,up_size);
+
+	__TRACE__("\n%s\n",decoded_username_and_passwd);
+
+	unsigned char * start_point=decoded_username_and_passwd+1; //this reason is what decoded_username_and_passwd's first char is '\0'
+
+	int zero_index=find_char(start_point,up_size*3/4+1,'\0');
+
+	printf("\nZero_index:%d\n",zero_index);
+	if(zero_index==-1)
+	{
+		return;
+	}
+
+	memcpy(it->username,start_point,zero_index);
+	it->username[zero_index]='\0';
+	__TRACE__("username:%s\n",it->username);
+
+	strcpy((char *)it->password,(char *)start_point+zero_index+1);  //jump username and '\0'
+
+	__TRACE__("password:%s\n",it->password);
+
+}
+void mail_parser(list<mail_data_type>::iterator it,unsigned char * buf,size_t size)
+{
+
+	//get from
+	//jump "FROM:<"
+	unsigned char *begin=buf+6;
+	int char_index=find_char(begin,size-5,'>');
+	if(char_index==-1)
+	{
+		__TRACE__("SEARCH CHAR FAILED\n");
+		return ;
+	}
+	memcpy(it->from,begin,char_index);
+
+	__TRACE__("FROM:%s\n",it->from);
+}
+void rcpt_parser(list<mail_data_type>::iterator it,unsigned char * buf,size_t size)
+{
+	//get TO
+	//jump "To:<"
+	unsigned char *begin=buf+4;
+	int char_index=find_char(begin,size-4,'>');
+	if(char_index==-1)
+	{
+		__TRACE__("SEARCH CHAR FAILED\n");
+		return ;
+	}
+	memcpy(it->sendto[it->sendto_num++],begin,char_index);
+
+	__TRACE__("TO:%s\n",it->sendto[it->sendto_num-1]);
+}
+void data_parser(list<mail_data_type>::iterator it,unsigned char * buf,size_t size)
+{
+	//search subject/date/user-agent/main_body/attachment
+	for(int i=SUBJECT;i<DATA_TABLES_SIZE;++i)
+	{
+		DATA_tables[i](it,buf,size);
+	}
+}
+void quit_parser(list<mail_data_type>::iterator it,unsigned char * buf,size_t size)
 {
 }
-void auth_parser(list<mail_data_type>::iterator it,unsigned char * buf)
-{
-}
-void mail_parser(list<mail_data_type>::iterator it,unsigned char * buf)
-{
-}
-void rcpt_parser(list<mail_data_type>::iterator it,unsigned char * buf)
-{
-}
-void data_parser(list<mail_data_type>::iterator it,unsigned char * buf)
-{
-}
-void quit_parser(list<mail_data_type>::iterator it,unsigned char * buf)
-{
-}
-void rset_parser(list<mail_data_type>::iterator it,unsigned char * buf)
+void rset_parser(list<mail_data_type>::iterator it,unsigned char * buf,size_t size)
 {
 }
 /*end smtp request function*/
 
 /*DATA parser function */
-void subject_parser(list<mail_data_type>::iterator it,unsigned char * buf)
+void subject_parser(list<mail_data_type>::iterator it,unsigned char * buf,size_t size)
 {
+	char * subject_str="Subject";
+	unsigned char* ret_str=read_info((unsigned char *)buf,size,(unsigned char*)subject_str,it->subject);
+	if(ret_str)
+	{
+		__TRACE__("Subject:%s\n",it->subject);
+	}
 }
-void date_parser(list<mail_data_type>::iterator it,unsigned char * buf)
+void date_parser(list<mail_data_type>::iterator it,unsigned char * buf,size_t size)
 {
+	char * date_str="Date";
+	unsigned char *ret_str=read_info((unsigned char *)buf,size,(unsigned char *)date_str,it->date);
+	if(ret_str)
+	{
+		__TRACE__("Date:%s\n",it->date);
+	}
 }
-void user_agent_parser(list<mail_data_type>::iterator it,unsigned char * buf)
+void user_agent_parser(list<mail_data_type>::iterator it,unsigned char * buf,size_t size)
 {
+	char * ua_str="User-Agent";
+	unsigned char *ret_str=read_info((unsigned char *)buf,size,(unsigned char *)ua_str,it->user_agent);
+	if(ret_str)
+	{
+		__TRACE__("User-Agent:%s\n",it->user_agent);
+	}
 }
-void main_body_parser(list<mail_data_type>::iterator it,unsigned char * buf)
+void main_body_parser(list<mail_data_type>::iterator it,unsigned char * buf,size_t size)
 {
+	//get content
+	content_parser(it,(char *)buf,size);
+	__TRACE__("main_body:%s\n",it->main_body);
 }
-void attachment_name_parser(list<mail_data_type>::iterator it,unsigned char * buf)
+void attachment_name_parser(list<mail_data_type>::iterator it,unsigned char * buf,size_t size)
 {
+
+	//get mail attachment name
+	char * content_disposition_str="Content-Disposition";
+	char * attachment_str="attachment; filename=\"";
+	int attachment_str_length=strlen(attachment_str);
+	unsigned char attachment[256]={0};
+	
+	unsigned char *ret_str=(unsigned char *)buf;
+
+	while(1)
+	{
+	    ret_str=read_info((unsigned char *)ret_str,size-(ret_str-(unsigned char *)buf),(unsigned char *)content_disposition_str,attachment);
+	
+
+		//no found ,break
+	    if(!ret_str)
+		{
+			break;
+		}
+	    
+	    printf("\nattachment:%s\n",attachment);
+	    //if == attachment
+	    if(strncasecmp((char *)attachment,attachment_str,strlen(attachment_str)-1)==0)
+	    {
+	    	//jump ":\r\n " 4chars 
+	    	unsigned char * position=attachment+attachment_str_length;
+	    	int index=find_char(position,strlen((char *) position),'\"');
+	    	if(index==-1)
+	    	{
+	    		return ;
+	    	}
+
+	    	memcpy(it->attachment_name[it->attachment_num++],position,index);
+	    	__TRACE__("Attachment:%s\n",it->attachment_name[it->attachment_num-1]);
+	    }
+	    
+		
+	}
 }
 /*end DATA parser funciton*/
 
@@ -100,7 +240,7 @@ int init()
 
 	//DATA table init
 	DATA_tables[SUBJECT]=subject_parser;
-	DATA_tables[DATE]=data_parser;
+	DATA_tables[DATE]=date_parser;
 	DATA_tables[USER_AGENT]=user_agent_parser;
 	DATA_tables[MAIN_BODY]=main_body_parser;
 	DATA_tables[ATTACHMENT_NAME]=attachment_name_parser;
@@ -383,62 +523,26 @@ void content_parser(list<mail_data_type>::iterator it,char * buf,size_t size)
 		}
 		else  //not boundary, this logic is correct,no modify
 		{
-			//jump all field
-			//
+			//jump all field/
 			char *content_data=jump_all_field((char *)ret_str);
 			char *end_pos=strstr(content_data,".\r\n");
 			if(end_pos==NULL)
 			{
-				return;
+				__TRACE__("no found end_pos .\\r\\n\n");
+
+				memcpy(it->main_body+it->main_body_num,content_data,size-(content_data-buf));
 			}
-			int length=end_pos-content_data;
-			memcpy(it->main_body+it->main_body_num,content_data,length);
-			it->main_body_num+=length;
-
-			//get content
+			else
+			{
+				int length=end_pos-content_data;
+				memcpy(it->main_body+it->main_body_num,content_data,length);
+				it->main_body_num+=length;
+			}
 		}
-		__TRACE__("main_body:%s\n",it->main_body);
 
 	}
 
 
-	//get mail attachment name
-	char * content_disposition_str="Content-Disposition";
-	char * attachment_str="attachment; filename=\"";
-	int attachment_str_length=strlen(attachment_str);
-	unsigned char attachment[256]={0};
-	
-	ret_str=(unsigned char *)buf;
-
-	while(1)
-	{
-	    ret_str=read_info((unsigned char *)ret_str,size-(ret_str-(unsigned char *)buf),(unsigned char *)content_disposition_str,attachment);
-	
-
-		//no found ,break
-	    if(!ret_str)
-		{
-			break;
-		}
-	    
-	    printf("\nattachment:%s\n",attachment);
-	    //if == attachment
-	    if(strncasecmp((char *)attachment,attachment_str,strlen(attachment_str)-1)==0)
-	    {
-	    	//jump ":\r\n " 4chars 
-	    	unsigned char * position=attachment+attachment_str_length;
-	    	int index=find_char(position,strlen((char *) position),'\"');
-	    	if(index==-1)
-	    	{
-	    		return ;
-	    	}
-
-	    	memcpy(it->attachment_name[it->attachment_num++],position,index);
-	    	__TRACE__("Attachment:%s\n",it->attachment_name[it->attachment_num-1]);
-	    }
-	    
-		
-	}
 }
 
 /************************************************************
@@ -463,140 +567,47 @@ void smtp_request_parser(list<mail_data_type>::iterator it, char * buf,size_t si
 		return;
 	}
 
-	if(strcmp(command,"EHLO")==0)
+	if(strcmp(command,"QUIT")==0)
+	{
+		it->smtp_request_state=QUIT;
+		smtp_request_tables[QUIT](it,begin,size-5);
+	}
+	else if(strcmp(command,"RSET")==0)
+	{
+		it->smtp_request_state=RSET;
+		smtp_request_tables[RSET](it,begin,size-5);
+	}
+	//the next call the callback function,the state is enum"DATA"
+	else if(it->smtp_request_state==DATA)
+	{
+		smtp_request_tables[DATA](it,(unsigned char *)buf,size);
+	}
+	else if(strcmp(command,"EHLO")==0)
 	{
 		it->smtp_request_state=EHLO;
-		get_line(begin,128,it->hostname);
-		__TRACE__("hostname:%s\n",it->hostname);
+		
+		smtp_request_tables[EHLO](it,begin,size-5);	
 	}
 	else if(strcmp(command,"AUTH")==0)
 	{
-		it->smtp_request_state=AUTH;
-		unsigned char auth_buf[128]={0};
-		int length=get_line(begin,128,auth_buf);
-	    
-		//get auth type
-		int blank_index=find_char(auth_buf,length,' ');
-		
-		if(blank_index!=-1)
-		{
-			memcpy(it->auth_type,auth_buf,blank_index);
-			it->auth_type[blank_index]='\0';
-			__TRACE__("auth type:%s\n",it->auth_type);
-		}
-
-		int up_size=length-blank_index-1; //username and passwd
-		//get user name
-		unsigned char encoded_username_and_passwd[128]={0};
-		memcpy(encoded_username_and_passwd,auth_buf+blank_index+1,up_size);
-		encoded_username_and_passwd[up_size]='\0';
-			
-		//decode
-		unsigned char decoded_username_and_passwd[128]={0};
-
-		base64_decode(decoded_username_and_passwd,encoded_username_and_passwd,up_size);
-
-		__TRACE__("\n%s\n",decoded_username_and_passwd);
-
-		unsigned char * start_point=decoded_username_and_passwd+1; //this reason is what decoded_username_and_passwd's first char is '\0'
-
-		int zero_index=find_char(start_point,up_size*3/4+1,'\0');
-
-		printf("\nZero_index:%d\n",zero_index);
-		if(zero_index==-1)
-		{
-			return;
-		}
-
-		memcpy(it->username,start_point,zero_index);
-		it->username[zero_index]='\0';
-		__TRACE__("username:%s\n",it->username);
-
-		strcpy((char *)it->password,(char *)start_point+zero_index+1);  //jump username and '\0'
-
-		__TRACE__("password:%s\n",it->password);
-
+	    it->smtp_request_state=AUTH;
+		smtp_request_tables[AUTH](it,begin,size-5);
 	}
 	else if(strcmp(command,"MAIL")==0)
 	{
 		it->smtp_request_state=MAIL;
-        
-		//get from
-		//jump "FROM:<"
-		begin+=6;
-		int char_index=find_char(begin,size-5-6,'>');
-		if(char_index==-1)
-		{
-			__TRACE__("SEARCH CHAR FAILED\n");
-			return ;
-		}
-		memcpy(it->from,begin,char_index);
-
-		__TRACE__("FROM:%s\n",it->from);
+		smtp_request_tables[MAIL](it,begin,size-5); 
 
 	}
 	else if(strcmp(command,"RCPT")==0)
 	{
 		it->smtp_request_state=RCPT;
-
-		//get TO
-		//jump "To:<"
-		begin+=4;
-		int char_index=find_char(begin,size-5-4,'>');
-		if(char_index==-1)
-		{
-			__TRACE__("SEARCH CHAR FAILED\n");
-			return ;
-		}
-		memcpy(it->sendto[it->sendto_num++],begin,char_index);
-
-		__TRACE__("TO:%s\n",it->sendto[it->sendto_num-1]);
+		smtp_request_tables[RCPT](it,begin,size-5);
 	}
 	else if(strcmp(command,"DATA")==0)
 	{
 		it->smtp_request_state=DATA;
-
 		// no data can capture
-	}
-	//the next call the callback function,the state is enum"DATA"
-	else if(it->smtp_request_state==DATA)
-	{
-
-
-		//get subject
-		char * subject_str="Subject";
-		unsigned char* ret_str=read_info((unsigned char *)buf,size,(unsigned char*)subject_str,it->subject);
-		if(ret_str)
-		{
-			__TRACE__("Subject:%s\n",it->subject);
-		}
-
-		char * date_str="Date";
-		ret_str=read_info((unsigned char *)buf,size,(unsigned char *)date_str,it->date);
-		if(ret_str)
-		{
-			__TRACE__("Date:%s\n",it->date);
-		}
-		
-		char * ua_str="User-Agent";
-		ret_str=read_info((unsigned char *)buf,size,(unsigned char *)ua_str,it->user_agent);
-		if(ret_str)
-		{
-			__TRACE__("User-Agent:%s\n",it->user_agent);
-		}
-
-		
-		//get content
-		content_parser(it,(char *)buf,size);
-
-	}
-	else if(strcmp(command,"QUIT")==0)
-	{
-		it->smtp_request_state=QUIT;
-	}
-	else if(strcmp(command,"RSET")==0)
-	{
-		it->smtp_request_state=RSET;
 	}
 	else
 	{
@@ -645,6 +656,8 @@ void tcp_callback(struct tcp_stream * a_tcp,void ** this_time_not_needed)
 			g_mail_data_list.back().source_port=a_tcp->addr.source;
 			g_mail_data_list.back().sendto_num=0;
 			g_mail_data_list.back().main_body_num=0;
+			g_mail_data_list.back().data_state=DATA_UNKOWN;
+			g_mail_data_list.back().smtp_request_state=UNKOWN;
 		}
 		return ;
 	}

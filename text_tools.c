@@ -184,7 +184,7 @@ char * jump_all_field(char * buf)
  ************************************/
 char * jump_nonprintable_chars(char * buf,size_t size)
 {
-	for(i=0;i<size;++i)
+	for(int i=0;i<size;++i)
 	{
 		if(buf[i]>=32)
 			return buf+i;
