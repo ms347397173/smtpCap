@@ -173,3 +173,22 @@ char * jump_all_field(char * buf)
 
 	return src;
 }
+
+/*************************************
+ * Summary:jump all not print chars,return first printable char's address
+ * Param:
+ *		buf:src buf
+ *		size: buf's size
+ * Return:
+ *		first printable char;s address,if all chars is nonprintable char in the buf,then return NULL
+ ************************************/
+char * jump_nonprintable_chars(char * buf,size_t size)
+{
+	for(i=0;i<size;++i)
+	{
+		if(buf[i]>=32)
+			return buf+i;
+	}
+	return NULL;
+
+}

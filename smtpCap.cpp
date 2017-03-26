@@ -27,9 +27,86 @@
 #include<list>
 using namespace std;
 
+//funciton statement
+int read_config_file();
+
+
 //global vars
 list<mail_data_type> g_mail_data_list;
 config_info_type g_config_info;
+void (*smtp_request_tables[11])(list<mail_data_type>::iterator,unsigned char *);   //smtp request parser function tables
+
+void (*DATA_tables[5])(list<mail_data_type>::iterator,unsigned char *);  //DATA parser funciton tables
+
+/*smtp request tables function*/
+void ehlo_parser(list<mail_data_type>::iterator it,unsigned char * buf)
+{
+}
+void auth_parser(list<mail_data_type>::iterator it,unsigned char * buf)
+{
+}
+void mail_parser(list<mail_data_type>::iterator it,unsigned char * buf)
+{
+}
+void rcpt_parser(list<mail_data_type>::iterator it,unsigned char * buf)
+{
+}
+void data_parser(list<mail_data_type>::iterator it,unsigned char * buf)
+{
+}
+void quit_parser(list<mail_data_type>::iterator it,unsigned char * buf)
+{
+}
+void rset_parser(list<mail_data_type>::iterator it,unsigned char * buf)
+{
+}
+/*end smtp request function*/
+
+/*DATA parser function */
+void subject_parser(list<mail_data_type>::iterator it,unsigned char * buf)
+{
+}
+void date_parser(list<mail_data_type>::iterator it,unsigned char * buf)
+{
+}
+void user_agent_parser(list<mail_data_type>::iterator it,unsigned char * buf)
+{
+}
+void main_body_parser(list<mail_data_type>::iterator it,unsigned char * buf)
+{
+}
+void attachment_name_parser(list<mail_data_type>::iterator it,unsigned char * buf)
+{
+}
+/*end DATA parser funciton*/
+
+
+int init()
+{
+	//read config file	
+	if(read_config_file())
+	{
+		return -1;
+	}
+
+	//smtp request table init
+	smtp_request_tables[EHLO]=ehlo_parser;
+	smtp_request_tables[AUTH]=auth_parser;
+	smtp_request_tables[MAIL]=mail_parser;
+	smtp_request_tables[RCPT]=rcpt_parser;
+	smtp_request_tables[DATA]=data_parser;
+	smtp_request_tables[QUIT]=quit_parser;
+	smtp_request_tables[RSET]=rset_parser;
+
+	//DATA table init
+	DATA_tables[SUBJECT]=subject_parser;
+	DATA_tables[DATE]=data_parser;
+	DATA_tables[USER_AGENT]=user_agent_parser;
+	DATA_tables[MAIN_BODY]=main_body_parser;
+	DATA_tables[ATTACHMENT_NAME]=attachment_name_parser;
+
+}
+
 
 #define int_ntoa(x) inet_ntoa(*((struct in_addr *)&x))
 char * adres (struct tuple4 addr)
@@ -223,8 +300,6 @@ char * read_a_boundary(list<mail_data_type>::iterator it,char * buf,size_t size,
  *****************************************************************/
 void content_parser(list<mail_data_type>::iterator it,char * buf,size_t size)
 {
-	//the follow code need refactor to a function  ***
-	//--***-------------***---------------***----------refactor---------***----------------------***--------------------------
 	//get mail content	,search first "Content-Type" field
 	char * boundary_str="boundary";   //boundary="...."
 	unsigned char content_type_data[128];
@@ -326,8 +401,6 @@ void content_parser(list<mail_data_type>::iterator it,char * buf,size_t size)
 
 	}
 
-
-	//------***------------------***------------end_refactor-------***---------------------***--------------------------
 
 	//get mail attachment name
 	char * content_disposition_str="Content-Disposition";
@@ -663,7 +736,8 @@ void tcp_callback(struct tcp_stream * a_tcp,void ** this_time_not_needed)
 int main()
 {
 
-	if(read_config_file())
+	//init
+	if(init()==-1)
 	{
 		return -1;
 	}

@@ -15,6 +15,16 @@ enum smtp_request_type
 
 };
 
+enum DATA_type
+{
+	DATA_UNKOWN,
+	SUBJECT,
+	DATE,
+	USER_AGENT,
+	MAIN_BODY,
+	ATTACHMENT_NAME
+};
+
 //this is meaningless 
 /*
 enum smtp_reply_type
@@ -36,7 +46,7 @@ typedef struct mail_data_type
 
 	//state
 	smtp_request_type smtp_request_state;
-
+	DATA_type data_state;
 	//EHLO
 	unsigned char hostname[128];
 	
