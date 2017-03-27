@@ -48,7 +48,7 @@ void ehlo_parser(list<mail_data_type>::iterator it,unsigned char * buf,size_t si
 	__TRACE__("hostname:%s\n",it->hostname);
 }
 
-//the function process auth:plain 
+//the function process auth type is "auth:plain "
 void auth_parser(list<mail_data_type>::iterator it,unsigned char * buf,size_t size)
 {
 	unsigned char auth_buf[128]={0};
@@ -72,16 +72,14 @@ void auth_parser(list<mail_data_type>::iterator it,unsigned char * buf,size_t si
 		
 	//decode
 	unsigned char decoded_username_and_passwd[128]={0};
-
 	base64_decode(decoded_username_and_passwd,encoded_username_and_passwd,up_size);
 
 	__TRACE__("\n%s\n",decoded_username_and_passwd);
 
 	unsigned char * start_point=decoded_username_and_passwd+1; //this reason is what decoded_username_and_passwd's first char is '\0'
 
+	//find '\0'
 	int zero_index=find_char(start_point,up_size*3/4+1,'\0');
-
-	printf("\nZero_index:%d\n",zero_index);
 	if(zero_index==-1)
 	{
 		return;
@@ -92,7 +90,6 @@ void auth_parser(list<mail_data_type>::iterator it,unsigned char * buf,size_t si
 	__TRACE__("username:%s\n",it->username);
 
 	strcpy((char *)it->password,(char *)start_point+zero_index+1);  //jump username and '\0'
-
 	__TRACE__("password:%s\n",it->password);
 
 }
@@ -129,8 +126,17 @@ void rcpt_parser(list<mail_data_type>::iterator it,unsigned char * buf,size_t si
 }
 void data_parser(list<mail_data_type>::iterator it,unsigned char * buf,size_t size)
 {
-	//search subject/date/user-agent/main_body/attachment
-	for(int i=SUBJECT;i<DATA_TABLES_SIZE;++i)
+	//search attachemnt in every packet
+	DATA_tables[ATTACHMENT_NAME](it,buf,size);
+
+	//the state is MAIN_BODY
+	if(it->data_state==MAIN_BODY)
+	{
+		DATA_tables[it->data_state](it,buf,size);
+		return;  //no enter recycle
+	}
+	//search subject/date/user-agent/main_body
+	for(int i=SUBJECT;i<=USER_AGENT;++i)
 	{
 		DATA_tables[i](it,buf,size);
 	}
@@ -150,6 +156,7 @@ void subject_parser(list<mail_data_type>::iterator it,unsigned char * buf,size_t
 	unsigned char* ret_str=read_info((unsigned char *)buf,size,(unsigned char*)subject_str,it->subject);
 	if(ret_str)
 	{
+		it->data_state=SUBJECT;
 		__TRACE__("Subject:%s\n",it->subject);
 	}
 }
@@ -159,6 +166,7 @@ void date_parser(list<mail_data_type>::iterator it,unsigned char * buf,size_t si
 	unsigned char *ret_str=read_info((unsigned char *)buf,size,(unsigned char *)date_str,it->date);
 	if(ret_str)
 	{
+		it->data_state=DATE;
 		__TRACE__("Date:%s\n",it->date);
 	}
 }
@@ -168,6 +176,7 @@ void user_agent_parser(list<mail_data_type>::iterator it,unsigned char * buf,siz
 	unsigned char *ret_str=read_info((unsigned char *)buf,size,(unsigned char *)ua_str,it->user_agent);
 	if(ret_str)
 	{
+		it->data_state=USER_AGENT;
 		__TRACE__("User-Agent:%s\n",it->user_agent);
 	}
 }
@@ -192,10 +201,10 @@ void attachment_name_parser(list<mail_data_type>::iterator it,unsigned char * bu
 	{
 	    ret_str=read_info((unsigned char *)ret_str,size-(ret_str-(unsigned char *)buf),(unsigned char *)content_disposition_str,attachment);
 	
-
 		//no found ,break
 	    if(!ret_str)
 		{
+			//__TRACE__("The Packet is Not Found Attachment\n");
 			break;
 		}
 	    
@@ -570,43 +579,38 @@ void smtp_request_parser(list<mail_data_type>::iterator it, char * buf,size_t si
 	if(strcmp(command,"QUIT")==0)
 	{
 		it->smtp_request_state=QUIT;
-		smtp_request_tables[QUIT](it,begin,size-5);
 	}
 	else if(strcmp(command,"RSET")==0)
 	{
 		it->smtp_request_state=RSET;
-		smtp_request_tables[RSET](it,begin,size-5);
 	}
 	//the next call the callback function,the state is enum"DATA"
 	else if(it->smtp_request_state==DATA)
 	{
-		smtp_request_tables[DATA](it,(unsigned char *)buf,size);
+		smtp_request_tables[it->smtp_request_state](it,(unsigned char *)buf,size);
+		return ;
 	}
 	else if(strcmp(command,"EHLO")==0)
 	{
 		it->smtp_request_state=EHLO;
-		
-		smtp_request_tables[EHLO](it,begin,size-5);	
 	}
 	else if(strcmp(command,"AUTH")==0)
 	{
 	    it->smtp_request_state=AUTH;
-		smtp_request_tables[AUTH](it,begin,size-5);
 	}
 	else if(strcmp(command,"MAIL")==0)
 	{
 		it->smtp_request_state=MAIL;
-		smtp_request_tables[MAIL](it,begin,size-5); 
 
 	}
 	else if(strcmp(command,"RCPT")==0)
 	{
 		it->smtp_request_state=RCPT;
-		smtp_request_tables[RCPT](it,begin,size-5);
 	}
 	else if(strcmp(command,"DATA")==0)
 	{
 		it->smtp_request_state=DATA;
+		return ;
 		// no data can capture
 	}
 	else
@@ -615,6 +619,8 @@ void smtp_request_parser(list<mail_data_type>::iterator it, char * buf,size_t si
 		it->smtp_request_state=UNKOWN;
 		return;
 	}
+
+	smtp_request_tables[it->smtp_request_state](it,begin,size-5);
 
 
 }
