@@ -4,9 +4,18 @@
  *Date: 2017/3/11
  *
  *************************************************/
-
 #define __DEBUG__  //use __TRACE__ macro
 #include"Trace.h"
+
+#define __LINUX_PLATFORM__
+
+#ifdef __LINUX_PLATFORM__
+#define SEPARATOR '/'
+#endif
+#ifdef __WINDOWS_PLATFORM__
+#define SEPARATOR '\\'   //windows
+#endif
+
 
 #include"smtp_type.h"
 
@@ -29,26 +38,25 @@ using namespace std;
 
 //funciton statement
 int read_config_file();
-char * read_a_boundary(list<mail_info_type>::iterator it,char * buf,size_t size,char * boundary);
 //global vars
-list<mail_info_type> g_mail_info_list;
+list<mail_data_type > g_mail_info_list;
 config_info_type g_config_info;
 
 #define SMTP_REQUEST_TABLES_SIZE (11)
-void (*smtp_request_tables[SMTP_REQUEST_TABLES_SIZE])(list<mail_info_type>::iterator,unsigned char *,size_t);   //smtp request parser function tables
+void (*smtp_request_tables[SMTP_REQUEST_TABLES_SIZE])(list<mail_data_type >::iterator,unsigned char *,size_t);   //smtp request parser function tables
 
 #define DATA_TABLES_SIZE (6)
-void (*DATA_tables[DATA_TABLES_SIZE])(list<mail_info_type>::iterator,unsigned char *,size_t);  //DATA parser funciton tables
+void (*DATA_tables[DATA_TABLES_SIZE])(list<mail_data_type >::iterator,unsigned char *,size_t);  //DATA parser funciton tables
 
 /*smtp request tables function*/
-void ehlo_parser(list<mail_info_type>::iterator it,unsigned char * buf,size_t size)
+void ehlo_parser(list<mail_data_type >::iterator it,unsigned char * buf,size_t size)
 {
-	get_line(buf,size,it->mail_data.hostname);
-	__TRACE__("hostname:%s\n",it->mail_data.hostname);
+	get_line(buf,size,it->hostname);
+	__TRACE__("hostname:%s\n",it->hostname);
 }
 
 //the function process auth type is "auth:plain "
-void auth_parser(list<mail_info_type>::iterator it,unsigned char * buf,size_t size)
+void auth_parser(list<mail_data_type >::iterator it,unsigned char * buf,size_t size)
 {
 	unsigned char auth_buf[128]={0};
 	int length=get_line(buf,size,auth_buf);
@@ -58,9 +66,9 @@ void auth_parser(list<mail_info_type>::iterator it,unsigned char * buf,size_t si
 	
 	if(blank_index!=-1)
 	{
-		memcpy(it->mail_data.auth_type,auth_buf,blank_index);
-		it->mail_data.auth_type[blank_index]='\0';
-		__TRACE__("auth type:%s\n",it->mail_data.auth_type);
+		memcpy(it->auth_type,auth_buf,blank_index);
+		it->auth_type[blank_index]='\0';
+		__TRACE__("auth type:%s\n",it->auth_type);
 	}
 
 	int up_size=length-blank_index-1; //username and passwd
@@ -84,15 +92,15 @@ void auth_parser(list<mail_info_type>::iterator it,unsigned char * buf,size_t si
 		return;
 	}
 
-	memcpy(it->mail_data.username,start_point,zero_index);
-	it->mail_data.username[zero_index]='\0';
-	__TRACE__("username:%s\n",it->mail_data.username);
+	memcpy(it->username,start_point,zero_index);
+	it->username[zero_index]='\0';
+	__TRACE__("username:%s\n",it->username);
 
-	strcpy((char *)it->mail_data.password,(char *)start_point+zero_index+1);  //jump username and '\0'
-	__TRACE__("password:%s\n",it->mail_data.password);
+	strcpy((char *)it->password,(char *)start_point+zero_index+1);  //jump username and '\0'
+	__TRACE__("password:%s\n",it->password);
 
 }
-void mail_parser(list<mail_info_type>::iterator it,unsigned char * buf,size_t size)
+void mail_parser(list<mail_data_type >::iterator it,unsigned char * buf,size_t size)
 {
 
 	//get from
@@ -104,11 +112,11 @@ void mail_parser(list<mail_info_type>::iterator it,unsigned char * buf,size_t si
 		__TRACE__("SEARCH CHAR FAILED\n");
 		return ;
 	}
-	memcpy(it->mail_data.from,begin,char_index);
+	memcpy(it->from,begin,char_index);
 
-	__TRACE__("FROM:%s\n",it->mail_data.from);
+	__TRACE__("FROM:%s\n",it->from);
 }
-void rcpt_parser(list<mail_info_type>::iterator it,unsigned char * buf,size_t size)
+void rcpt_parser(list<mail_data_type >::iterator it,unsigned char * buf,size_t size)
 {
 	//get TO
 	//jump "To:<"
@@ -119,19 +127,19 @@ void rcpt_parser(list<mail_info_type>::iterator it,unsigned char * buf,size_t si
 		__TRACE__("SEARCH CHAR FAILED\n");
 		return ;
 	}
-	memcpy(it->mail_data.sendto[it->mail_data.sendto_num++],begin,char_index);
+	memcpy(it->sendto[it->sendto_num++],begin,char_index);
 
-	__TRACE__("TO:%s\n",it->mail_data.sendto[it->mail_data.sendto_num-1]);
+	__TRACE__("TO:%s\n",it->sendto[it->sendto_num-1]);
 }
-void data_parser(list<mail_info_type>::iterator it,unsigned char * buf,size_t size)
+void data_parser(list<mail_data_type >::iterator it,unsigned char * buf,size_t size)
 {
-	//search attachemnt in every DATA packet
+	//search attachemnt name in every DATA packet
 	DATA_tables[ATTACHMENT_NAME](it,buf,size);
 
 	//the state is MAIN_BODY
-	if(it->mail_data.data_state==MAIN_BODY)
+	if(it->data_state==MAIN_BODY)
 	{
-		DATA_tables[it->mail_data.data_state](it,buf,size);
+		DATA_tables[it->data_state](it,buf,size);
 		return;  //no enter recycle
 	}
 	//search subject/date/user-agent/main_body
@@ -140,220 +148,88 @@ void data_parser(list<mail_info_type>::iterator it,unsigned char * buf,size_t si
 		DATA_tables[i](it,buf,size);
 	}
 }
-void quit_parser(list<mail_info_type>::iterator it,unsigned char * buf,size_t size)
+void quit_parser(list<mail_data_type >::iterator it,unsigned char * buf,size_t size)
 {
 	//no code
 }
-void rset_parser(list<mail_info_type>::iterator it,unsigned char * buf,size_t size)
+void rset_parser(list<mail_data_type >::iterator it,unsigned char * buf,size_t size)
 {
 	//no code
 }
 /*end smtp request function*/
 
 /*DATA parser function */
-void subject_parser(list<mail_info_type>::iterator it,unsigned char * buf,size_t size)
+void subject_parser(list<mail_data_type >::iterator it,unsigned char * buf,size_t size)
 {
 	char * subject_str="Subject";
-	unsigned char* ret_str=read_info((unsigned char *)buf,size,(unsigned char*)subject_str,it->mail_data.subject);
+	unsigned char* ret_str=read_info((unsigned char *)buf,size,(unsigned char*)subject_str,it->subject);
 	if(ret_str)
 	{
-		it->mail_data.data_state=SUBJECT;
-		__TRACE__("Subject:%s\n",it->mail_data.subject);
+		it->data_state=SUBJECT;
+		__TRACE__("Subject:%s\n",it->subject);
 	}
 }
-void date_parser(list<mail_info_type>::iterator it,unsigned char * buf,size_t size)
+void date_parser(list<mail_data_type >::iterator it,unsigned char * buf,size_t size)
 {
 	char * date_str="Date";
-	unsigned char *ret_str=read_info((unsigned char *)buf,size,(unsigned char *)date_str,it->mail_data.date);
+	unsigned char *ret_str=read_info((unsigned char *)buf,size,(unsigned char *)date_str,it->date);
 	if(ret_str)
 	{
-		it->mail_data.data_state=DATE;
-		__TRACE__("Date:%s\n",it->mail_data.date);
+		it->data_state=DATE;
+		__TRACE__("Date:%s\n",it->date);
 	}
 }
-void user_agent_parser(list<mail_info_type>::iterator it,unsigned char * buf,size_t size)
+void user_agent_parser(list<mail_data_type >::iterator it,unsigned char * buf,size_t size)
 {
 	char * ua_str="User-Agent";
-	unsigned char *ret_str=read_info((unsigned char *)buf,size,(unsigned char *)ua_str,it->mail_data.user_agent);
+	unsigned char *ret_str=read_info((unsigned char *)buf,size,(unsigned char *)ua_str,it->user_agent);
 	if(ret_str)
 	{
-		it->mail_data.data_state=USER_AGENT;
-		__TRACE__("User-Agent:%s\n",it->mail_data.user_agent);
+		it->data_state=USER_AGENT;
+		__TRACE__("User-Agent:%s\n",it->user_agent);
 	}
 }
 
-void push_new_boundary(list<mail_info_type>::iterator it,unsigned char * buf)
+
+/*************************************************************************************
+ * Summary: get mail content ,save to eml file 
+ * Param:
+ *		it: mail_data_type 's iterator
+ *		buf: receieved data
+ *		size: buf;s size
+ ************************************************************************************/
+void save_data_to_file(FILE * fp, unsigned char * buf,size_t size)
 {
-	mail_parser_type mp;
-	buf+=strlen("boundary=\"");
-	memset(&mp,0,sizeof(mp));
-	mp.boundary[0]='-';
-	mp.boundary[1]='-';
-	int chars=find_char(buf,64,'\"');
-	if(chars!=-1)
+	if(fp)
 	{
-		memcpy(mp.boundary+2,buf,chars);
+		fwrite(buf,size,1,fp);
 	}
-	it->s_mp.push(mp);
 }
 
 /****************************************************************************************
- * Summary: jump all no content data to get content
+ * Summary: main_body parser
  * Param: 
- *		it: mail_info_type's iterator
+ *		it: mail_data_type 's iterator
  *		buf: receieved data
  *		size: buf's size
  ****************************************************************************************/
-void main_body_parser(list<mail_info_type>::iterator it,unsigned char * buf,size_t size)
+void main_body_parser(list<mail_data_type >::iterator it,unsigned char * buf,size_t size)
 {
-	//get content
-	//get mail content	,search first "Content-Type" field
-	char * boundary_str="boundary";   //boundary="...."
-	char * content_type_str="Content-Type";
-    char * content_disposition_str="Content-Disposition";
+	FILE* fp=NULL;
 
-	it->mail_data.data_state=MAIN_BODY;  //set state
-	
-	unsigned char * ret_str=buf;
+	char file_path[256]={0};
+	strcpy(file_path,g_config_info.eml_path);
+	strcat(file_path,(char*)it->eml_file_name);
 
-	if(it->s_mp.empty())  //is empty
+	fp=fopen(file_path,"a");
+	if(fp)
 	{
-		unsigned char content_type_data[128];
-		unsigned char  boundary_data[128];
-		char * boundary_index=NULL;
-
-		//ret_str will jump boundary
-		ret_str=read_info((unsigned char *)buf,size,(unsigned char *)content_type_str,content_type_data);
-
-	    if(ret_str)   //have content-type
-	    {
-
-	    	boundary_index=strcasestr((char *)content_type_data,boundary_str);
-	    	if(boundary_index)  //exist boundary
-	    	{
-	    		it->is_boundary=true;
-	    		//get content type/////////////////////////////////////////////////////////
-	    		mail_parser_type tmp;
-	    		memcpy(tmp.content_type,content_type_data,(int)(boundary_index-(char *)content_type_data));
-	    		/////////////////////////////////////////////////////////////////////////
-
-	    		//get boundary
-	    		boundary_index+=strlen("boundary=\"");
-	    		int chars=find_char((unsigned char *)boundary_index,128-(int)((unsigned char *)boundary_index-content_type_data),(unsigned char)'\"');
-	    		if(chars!=-1)
-	    		{	
-	    			memcpy(boundary_data,boundary_index,chars);
-	    			boundary_data[chars]='\0';
-	    		}
-	    		else
-	    		{
-	    			return;
-	    		}
-
-	    		//construct boundary string
-	    		unsigned char boundary[64];
-	    		memset(boundary,0,sizeof(boundary));
-	    		boundary[0]='-';
-	    		boundary[1]='-';
-	    		memcpy(boundary+2,boundary_data,strlen((const char *)boundary_data));
-
-	    		__TRACE__("boundary:%s\n",boundary);
-	    		//get boundary///////////////////////////////////////////////////////////
-	    		memcpy(tmp.boundary,boundary,strlen((const char *)boundary));
-	    		////////////////////////////////////////////////////////////////////////
-				
-	    		//push 
-	    		it->s_mp.push(tmp);
-
-				//jump first boundary
-				char *ret = strstr((char *)ret_str,(char *)tmp.boundary);
-				if(ret==NULL)
-				{
-					return;  //no first boundary
-				}
-				else
-				{
-					ret_str=(unsigned char *)ret+strlen((char *)tmp.boundary)+strlen("\"\r\n");
-				}
-			}
-	    	else  //not boundary, this logic is correct,no modify
-	    	{
-				__TRACE__("no boundary\n");
-
-
-	    		//jump all field
-	    		char *content_data=jump_all_field((char *)ret_str);
-	    		char *end_pos=strstr(content_data,".\r\n");
-	    		if(end_pos==NULL)
-	    		{
-	    			__TRACE__("no found end_pos .\\r\\n\n");
-
-	    			memcpy(it->mail_data.main_body+it->mail_data.main_body_num,content_data,size-(content_data-(char *)buf));
-	    		}
-	    		else
-	    		{
-	    			int length=end_pos-content_data;
-					__TRACE__("length:%d\n",length);
-	    			memcpy(it->mail_data.main_body+it->mail_data.main_body_num,content_data,length);
-	    			it->mail_data.main_body_num+=length;
-	    		}
-				
-				__TRACE__("main_body:%s\n",it->mail_data.main_body);
-				return; //end
-	    	}//else end
-
-	    }
-
+		save_data_to_file(fp,buf,size);
+		fclose(fp);
 	}
 
-	int boundary_length;
-	unsigned char content_data[128];
-
-	//this recycle have some logic bug
-	while(!it->s_mp.empty())
-	{
-		unsigned char *ret=read_info(ret_str,(size_t)(ret_str-(unsigned char *)buf),(unsigned char *)content_type_str,content_data);
-		if(ret==NULL)
-		{
-			memcpy(it->mail_data.main_body+it->mail_data.main_body_num,ret_str,size-(ret-(unsigned char *)buf));
-			__TRACE__("main_body:%s\n",it->mail_data.main_body);
-			return;
-		}
-		ret_str=ret;
-		char * new_boundary_str;
-		if((new_boundary_str=strstr((char *)content_data,(char *)boundary_str))!=NULL)
-		{
-			//have new boundary	
-			push_new_boundary(it,(unsigned char *)new_boundary_str);
-		}
-		boundary_length=strlen((const char *)it->s_mp.top().boundary);  //get length
-		ret_str=(unsigned char *)jump_all_field((char *)ret_str);
-
-		char * boundary_end=strstr((char *)ret_str,(char *)it->s_mp.top().boundary);
-		if(boundary_end==NULL)   //if the packet no boundary,recieved all data
-		{
-			memcpy(it->mail_data.main_body+it->mail_data.main_body_num,ret_str,size);
-
-			__TRACE__("main_body:%s\n",it->mail_data.main_body);
-			return;
-		}
-		else
-		{
-			memcpy(it->mail_data.main_body+it->mail_data.main_body_num,ret_str,(int)(boundary_end-(char *)ret_str));
-			ret_str=(unsigned char *)boundary_end+boundary_length;
-			if(*ret_str='-' && *(ret_str+1)=='-')
-			{
-				it->s_mp.pop();  //pop data
-				ret_str+=2;
-			}
-			ret_str+=2;
-
-		}
-
-	}
-	__TRACE__("main_body:%s\n",it->mail_data.main_body);
 }
-void attachment_name_parser(list<mail_info_type>::iterator it,unsigned char * buf,size_t size)
+void attachment_name_parser(list<mail_data_type >::iterator it,unsigned char * buf,size_t size)
 {
 
 	//get mail attachment name
@@ -387,8 +263,8 @@ void attachment_name_parser(list<mail_info_type>::iterator it,unsigned char * bu
 	    		return ;
 	    	}
 
-	    	memcpy(it->mail_data.attachment_name[it->mail_data.attachment_num++],position,index);
-	    	__TRACE__("Attachment:%s\n",it->mail_data.attachment_name[it->mail_data.attachment_num-1]);
+	    	memcpy(it->attachment_name[it->attachment_num++],position,index);
+	    	__TRACE__("Attachment:%s\n",it->attachment_name[it->attachment_num-1]);
 	    }
 	    
 		
@@ -442,12 +318,12 @@ char * adres (struct tuple4 addr)
  *Return:
  *		return matched element's iterator ,no matched return end()
  ******************************************************************/
-list<mail_info_type>::iterator find_element_from_list(unsigned short source_port)
+list<mail_data_type >::iterator find_element_from_list(unsigned short source_port)
 {
-	list<mail_info_type>::iterator it=g_mail_info_list.begin();
+	list<mail_data_type >::iterator it=g_mail_info_list.begin();
 	for(;it!=g_mail_info_list.end();++it)
 	{
-		if(it->mail_data.source_port==source_port)
+		if(it->source_port==source_port)
 		{
 			break;
 		}
@@ -497,6 +373,20 @@ int read_config_file()
 		return -1;
 	}
 
+	memset(buf,0,64);
+	fscanf(fp,"%s",buf);
+	if(strncmp(buf,"eml_path:",9)==0)
+	{
+		strcpy(g_config_info.eml_path,buf+9);
+	}
+	else
+	{
+		fclose(fp);
+		return -1;
+	}
+
+
+
 	fclose(fp);
 	return 0;
 }
@@ -504,12 +394,12 @@ int read_config_file()
 /*****************************************************************
  * Summary: thread entry
  * Param:
- *		arg: is type of (mail_info_type*) ,pointer of sended data
+ *		arg: is type of (mail_data_type *) ,pointer of sended data
  *
  *****************************************************************/
 void * thread_start(void * arg)
 {
-	mail_info_type* data= (mail_info_type*)arg;
+	mail_data_type * data= (mail_data_type *)arg;
 	
 	//sock conn
 	struct sockaddr_in server_address;
@@ -531,7 +421,7 @@ void * thread_start(void * arg)
 		exit(2);
 	}
 	
-	int ret=send(sock,data,sizeof(mail_info_type),0);
+	int ret=send(sock,data,sizeof(mail_data_type ),0);
 	if(ret<=0)
 	{
 		close(sock);
@@ -550,7 +440,7 @@ void * thread_start(void * arg)
  *		0:SUCCESS
  *		-1:Failed
  *************************************************/
-int send_data_to_server(list<mail_info_type>::iterator it)
+int send_data_to_server(list<mail_data_type >::iterator it)
 {
 
 	int ret;
@@ -568,56 +458,6 @@ int send_data_to_server(list<mail_info_type>::iterator it)
 
 	return 0;
 }
-
-/**********************************************************************************************
- * Summary: read content until the next boundary or end
- * Param: 
- *		it: the mail tcp link data struct
- *		buf: data buffer
- *		size: buf's size
- *		boundary: boundary of mail
- *		__OUT_PARAM__ type: is a int pointer ,if *type==0 ,then readed the end boundary ,else readed the next boundary
- * Return: 
- *		if get_line failed then return NULL,else return unread data address
- ***********************************************************************************************/
-char * read_a_boundary(list<mail_info_type>::iterator it,char * buf,size_t size,char * boundary,__OUT_PARAM__ int * type)
-{
-
-	unsigned char tmp[1024];
-	int boundary_length=strlen(boundary);
-	char end_boundary[1024];
-	memset(end_boundary,0,1024);
-	memcpy(end_boundary,boundary,boundary_length);
-	end_boundary[boundary_length]='-';
-	end_boundary[boundary_length+1]='-';
-	while(1)
-	{
-		memset(tmp,0,1024);
-
-		int chars=get_line((unsigned char*)buf+it->mail_data.main_body_num,size-it->mail_data.main_body_num,tmp);
-		if(chars==-1)
-		{
-			return NULL;
-		}
-		if(strncmp((char *)tmp,(char *)boundary,boundary_length)==0)  //to end
-		{
-			*type=1;
-			break;
-		}	
-		if(strncmp((char *)tmp,(char *)end_boundary,boundary_length+2)==0)  //to end
-		{
-			*type=0;  //end boundary
-			break;
-		}
-		memcpy(it->mail_data.main_body+it->mail_data.main_body_num,tmp,chars);
-		it->mail_data.main_body_num+=chars;
-		memcpy(it->mail_data.main_body+it->mail_data.main_body_num,"\r\n",2);
-		it->mail_data.main_body_num+=2;
-
-	}
-	return buf+it->mail_data.main_body_num;
-}
-
 /************************************************************
  *  Summary: analyze sended smtp packet from buffer
  *  param:
@@ -625,7 +465,7 @@ char * read_a_boundary(list<mail_info_type>::iterator it,char * buf,size_t size,
  *		buf : buf from nids server data
  *		size : data's size
  ***********************************************************/
-void smtp_request_parser(list<mail_info_type>::iterator it, char * buf,size_t size)
+void smtp_request_parser(list<mail_data_type >::iterator it, char * buf,size_t size)
 {
 	unsigned char * begin=(unsigned char *)buf;  //a pointer for parser
 	unsigned char * end=NULL;
@@ -642,61 +482,61 @@ void smtp_request_parser(list<mail_info_type>::iterator it, char * buf,size_t si
 
 	if(strcmp(command,"QUIT")==0)  //no use strcasecmp
 	{
-		it->mail_data.smtp_request_state=QUIT;
+		it->smtp_request_state=QUIT;
 	}
 	else if(strcmp(command,"RSET")==0)
 	{
-		it->mail_data.smtp_request_state=RSET;
+		it->smtp_request_state=RSET;
 	}
 	//the next call the callback function,the state is enum"DATA"
-	else if(it->mail_data.smtp_request_state==DATA)
+	else if(it->smtp_request_state==DATA)
 	{
-		smtp_request_tables[it->mail_data.smtp_request_state](it,(unsigned char *)buf,size);
+		smtp_request_tables[it->smtp_request_state](it,(unsigned char *)buf,size); 
 		return ;
 	}
 	else if(strcmp(command,"EHLO")==0)
 	{
-		it->mail_data.smtp_request_state=EHLO;
+		it->smtp_request_state=EHLO;
 	}
 	else if(strcmp(command,"AUTH")==0)
 	{
-	    it->mail_data.smtp_request_state=AUTH;
+	    it->smtp_request_state=AUTH;
 	}
 	else if(strcmp(command,"MAIL")==0)
 	{
-		it->mail_data.smtp_request_state=MAIL;
+		it->smtp_request_state=MAIL;
 
 	}
 	else if(strcmp(command,"RCPT")==0)
 	{
-		it->mail_data.smtp_request_state=RCPT;
+		it->smtp_request_state=RCPT;
 	}
 	else if(strcmp(command,"DATA")==0)
 	{
-		it->mail_data.smtp_request_state=DATA;
+		it->smtp_request_state=DATA;
 		return ;
 		// no data can capture
 	}
 	else
 	{
 		//no support
-		it->mail_data.smtp_request_state=UNKOWN;
+		it->smtp_request_state=UNKOWN;
 		return;
 	}
 
 	//transfer table
-	smtp_request_tables[it->mail_data.smtp_request_state](it,begin,size-5);
+	smtp_request_tables[it->smtp_request_state](it,begin,size-5);
 
 }
 
 /**************************************************************
  *  Summary: analyze received smtp packet from buffer
  *  param:
- *		it : list's iterator
+ *		it-> list's iterator
  *		buf : buf from nids client data
  *		size : buf's size
  ***************************************************************/
-void smtp_reply_parser(list<mail_info_type>::iterator it,char * buf,size_t size)
+void smtp_reply_parser(list<mail_data_type >::iterator it,char * buf,size_t size)
 {
 	//no use
 }
@@ -723,12 +563,20 @@ void tcp_callback(struct tcp_stream * a_tcp,void ** this_time_not_needed)
 
 			//create a object in list recording source port
 			g_mail_info_list.resize(g_mail_info_list.size()+1);
-			g_mail_info_list.back().mail_data.source_port=a_tcp->addr.source;
-			g_mail_info_list.back().mail_data.sendto_num=0;
-			g_mail_info_list.back().mail_data.main_body_num=0;
-			g_mail_info_list.back().mail_data.data_state=DATA_UNKOWN;
-			g_mail_info_list.back().mail_data.smtp_request_state=UNKOWN;
-			g_mail_info_list.back().is_boundary=false;  //default is no boundary mail
+
+			mail_data_type& end=g_mail_info_list.back();
+			end.source_port=a_tcp->addr.source;
+			end.sendto_num=0;
+			end.data_state=DATA_UNKOWN;
+			end.smtp_request_state=UNKOWN;
+
+			//determine new eml file
+			char filename[64]={0};
+			sprintf(filename,"%d",time(NULL));
+			filename[strlen(filename)]='_';
+			sprintf(filename+strlen(filename),"%d",(int)end.source_port);
+			strcat(filename,".eml");
+			strcpy((char *)end.eml_file_name,filename);
 		}
 		return ;
 	}
@@ -744,7 +592,7 @@ void tcp_callback(struct tcp_stream * a_tcp,void ** this_time_not_needed)
         a_tcp->client.collect_urg--;
 
 		//find object
-		list<mail_info_type>::iterator it=find_element_from_list(a_tcp->addr.source);
+		list<mail_data_type >::iterator it=find_element_from_list(a_tcp->addr.source);
 		
 		//send object to server
         if(it!=g_mail_info_list.end())
@@ -768,7 +616,7 @@ void tcp_callback(struct tcp_stream * a_tcp,void ** this_time_not_needed)
         a_tcp->client.collect_urg--;
 
 		//delete object from list
-		list<mail_info_type>::iterator it=find_element_from_list(a_tcp->addr.source);
+		list<mail_data_type >::iterator it=find_element_from_list(a_tcp->addr.source);
 		g_mail_info_list.erase(it);
 
 		return;
@@ -777,7 +625,7 @@ void tcp_callback(struct tcp_stream * a_tcp,void ** this_time_not_needed)
 	//receiveing data
 	if(a_tcp->nids_state == NIDS_DATA)
 	{
-		list<mail_info_type>::iterator it=find_element_from_list(a_tcp->addr.source);
+		list<mail_data_type >::iterator it=find_element_from_list(a_tcp->addr.source);
 		
 		if(it==g_mail_info_list.end())
 		{

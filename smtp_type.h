@@ -67,29 +67,12 @@ typedef struct mail_data_type
 	unsigned char subject[1024];
 	unsigned char date[64];
 	unsigned char user_agent[64];
-	unsigned char main_body[65536];   //the content isn't base64 code ,is being decoded
-	int main_body_num;  //<=65535
 	unsigned char attachment_name[16][128]; 
 	int attachment_num;  //<=16
 
+	unsigned char eml_file_name[256];
+
 }mail_data_type;
-
-typedef struct mail_parser_type
-{
-	unsigned char content_type[128];
-	unsigned char content_transfer_encoding[64];
-	unsigned char boundary[64];  //constructed
-	unsigned char attach_str[128];
-
-}mail_parser_type;
-
-typedef struct mail_info_type
-{
-	struct mail_data_type mail_data;
-	std::stack<mail_parser_type> s_mp;
-	bool is_boundary;  //true s_mp is useful
-	
-}mail_info_type;
 
 
 //this structure save config infomation for smtpCap
@@ -97,4 +80,5 @@ typedef struct config_info_type
 {
 	int server_ip;
 	unsigned short server_port;
+	char eml_path[256];
 }config_info_type;
