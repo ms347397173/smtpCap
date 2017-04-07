@@ -1,0 +1,39 @@
+To: ms347397173@hotmail.com
+From: m <ms347397173@sina.com>
+Subject: 2
+Message-ID: <8e10df8e-bed6-b29d-352f-43a0ee5a76b3@sina.com>
+Date: Thu, 6 Apr 2017 23:47:17 -0700
+User-Agent: Mozilla/5.0 (X11; Linux i686; rv:45.0) Gecko/20100101
+ Thunderbird/45.8.0
+MIME-Version: 1.0
+Content-Type: multipart/mixed;
+ boundary="------------02FF3D69CFE6817EC9153D5A"
+
+This is a multi-part message in MIME format.
+--------------02FF3D69CFE6817EC9153D5A
+Content-Type: text/plain; charset=gbk; format=flowed
+Content-Transfer-Encoding: 7bit
+
+2
+
+
+--------------02FF3D69CFE6817EC9153D5A
+Content-Type: text/x-chdr;
+ name="base64.h"
+Content-Transfer-Encoding: 7bit
+Content-Disposition: attachment;
+ filename="base64.h"
+
+/**********************************
+ * Summary:base64 libary
+ * Author:ms
+ * Date:2017/3/18
+ ********************************/
+#include<stddef.h>
+const unsigned char * base64_encode(unsigned char * dest,const unsigned char * src,size_t src_length);
+
+const unsigned char * base64_decode(unsigned char * dest,const unsigned char * src,size_t src_length);
+
+
+--------------02FF3D69CFE6817EC9153D5A--
+.

@@ -1,0 +1,110 @@
+To: ms347397173@hotmail.com
+From: m <ms347397173@sina.com>
+Subject: asdsad
+Message-ID: <c0d2a70a-4e69-9689-8c8a-92e538538c95@sina.com>
+Date: Thu, 6 Apr 2017 23:46:17 -0700
+User-Agent: Mozilla/5.0 (X11; Linux i686; rv:45.0) Gecko/20100101
+ Thunderbird/45.8.0
+MIME-Version: 1.0
+Content-Type: multipart/mixed;
+ boundary="------------321FB7DF846DC74396362911"
+
+This is a multi-part message in MIME format.
+--------------321FB7DF846DC74396362911
+Content-Type: text/plain; charset=gbk; format=flowed
+Content-Transfer-Encoding: 7bit
+
+skadfjsfldsf
+
+
+--------------321FB7DF846DC74396362911
+Content-Type: text/plain; charset=UTF-8;
+ name="tags"
+Content-Transfer-Encoding: 7bit
+Content-Disposition: attachment;
+ filename="tags"
+
+!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;" to lines/
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/
+!_TAG_PROGRAM_AUTHOR	Darren Hiebert	/dhiebert@users.sourceforge.net/
+!_TAG_PROGRAM_NAME	Exuberant Ctags	//
+!_TAG_PROGRAM_URL	http://ctags.sourceforge.net	/official site/
+!_TAG_PROGRAM_VERSION	5.8	//
+AUTH	smtp_type.h	/^	AUTH,$/;"	e	enum:smtp_request_type
+BASE64	Makefile	/^BASE64=base64.c$/;"	m
+CC	Makefile	/^CC=g++$/;"	m
+DATA	smtp_type.h	/^	DATA,$/;"	e	enum:smtp_request_type
+DEBUG	Makefile	/^DEBUG=-g$/;"	m
+EHLO	smtp_type.h	/^	EHLO,$/;"	e	enum:smtp_request_type
+LIBS	Makefile	/^LIBS=$(NIDSLIB) $(NETLIB) $(PCAPLIB) -lnsl -lgthread-2.0 $(BASE64) $(TEXTTOOLS)$/;"	m
+MAIL	smtp_type.h	/^	MAIL,$/;"	e	enum:smtp_request_type
+NETLIB	Makefile	/^NETLIB=-lnet$/;"	m
+NIDSLIB	Makefile	/^NIDSLIB=-lnids$/;"	m
+NOOP	smtp_type.h	/^	NOOP,$/;"	e	enum:smtp_request_type
+NO_WARN	Makefile	/^NO_WARN=-Wall$/;"	m
+PCAPLIB	Makefile	/^PCAPLIB=-lpcap$/;"	m
+QUIT	smtp_type.h	/^	QUIT,$/;"	e	enum:smtp_request_type
+RCPT	smtp_type.h	/^	RCPT,$/;"	e	enum:smtp_request_type
+RSET	smtp_type.h	/^	RSET,$/;"	e	enum:smtp_request_type
+TEXTTOOLS	Makefile	/^TEXTTOOLS=text_tools.c$/;"	m
+TURN	smtp_type.h	/^	TURN$/;"	e	enum:smtp_request_type
+UNKOWN	smtp_type.h	/^	UNKOWN,$/;"	e	enum:smtp_request_type
+VRFY	smtp_type.h	/^	VRFY,$/;"	e	enum:smtp_request_type
+__DEBUG__	smtpCap.cpp	8;"	d	file:
+__OUT_PARAM__	text_tools.c	6;"	d	file:
+__OUT_PARAM__	text_tools.h	9;"	d
+__TRACE__	Trace.h	2;"	d
+__TRACE__	Trace.h	5;"	d
+adres	smtpCap.cpp	/^char * adres (struct tuple4 addr)$/;"	f
+attachment_name	smtp_type.h	/^	unsigned char attachment_name[16][128]; $/;"	m	struct:mail_data_type
+attachment_num	smtp_type.h	/^	int attachment_num;  \/\/<=16$/;"	m	struct:mail_data_type
+auth_type	smtp_type.h	/^	unsigned char auth_type[32];$/;"	m	struct:mail_data_type
+base64_decode	base64.c	/^const unsigned char * base64_decode(unsigned char * dest,const unsigned char * src,size_t src_length)$/;"	f
+base64_decode_array	base64.c	/^static const unsigned char base64_decode_array[256] =$/;"	v	file:
+base64_encode	base64.c	/^const unsigned char * base64_encode(unsigned char * dest,const unsigned char * src,size_t src_length)$/;"	f
+base64char	base64.c	/^const char * base64char = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+\/";$/;"	v
+buf	test_base64.c	/^unsigned char buf[128];$/;"	v
+buf2	test_base64.c	/^unsigned char buf2[128];	$/;"	v
+config_info_type	smtp_type.h	/^typedef struct config_info_type$/;"	s
+config_info_type	smtp_type.h	/^}config_info_type;$/;"	t	typeref:struct:config_info_type
+content_parser	smtpCap.cpp	/^char * content_parser(list<mail_data_type>::iterator it,char * buf,size_t size)$/;"	f
+date	smtp_type.h	/^	unsigned char date[64];$/;"	m	struct:mail_data_type
+find_char	text_tools.c	/^int find_char(unsigned char * buf,size_t size,unsigned char ch)$/;"	f
+find_element_from_list	smtpCap.cpp	/^list<mail_data_type>::iterator find_element_from_list(unsigned short source_port)$/;"	f
+from	smtp_type.h	/^	unsigned char from[128];$/;"	m	struct:mail_data_type
+g_config_info	smtpCap.cpp	/^config_info_type g_config_info;$/;"	v
+get_line	text_tools.c	/^int get_line(unsigned char *buf,size_t size,__OUT_PARAM__ unsigned char* ret)$/;"	f
+hostname	smtp_type.h	/^	unsigned char hostname[128];$/;"	m	struct:mail_data_type
+int_ntoa	smtpCap.cpp	34;"	d	file:
+jump_all_field	text_tools.c	/^char * jump_all_field(char * buf)$/;"	f
+mail_data_type	smtp_type.h	/^typedef struct mail_data_type$/;"	s
+mail_data_type	smtp_type.h	/^}mail_data_type;$/;"	t	typeref:struct:mail_data_type
+main	smtpCap.cpp	/^int main()$/;"	f
+main	test_base64.c	/^int main()$/;"	f
+main_body	smtp_type.h	/^	unsigned char main_body[65536];   \/\/the content isn't base64 code ,is being decoded$/;"	m	struct:mail_data_type
+main_body_num	smtp_type.h	/^	int main_body_num;  \/\/<=65535$/;"	m	struct:mail_data_type
+password	smtp_type.h	/^	unsigned char password[128];$/;"	m	struct:mail_data_type
+read_a_boundary	smtpCap.cpp	/^char * read_a_boundary(list<mail_data_type>::iterator it,char * buf,size_t size,char * boundary)$/;"	f
+read_config_file	smtpCap.cpp	/^int read_config_file()$/;"	f
+read_info	text_tools.c	/^unsigned char * read_info(unsigned char * buf,size_t size,unsigned char * key_str,__OUT_PARAM__ unsigned char * value_str)$/;"	f
+send_data_to_server	smtpCap.cpp	/^int send_data_to_server(list<mail_data_type>::iterator it)$/;"	f
+sendto	smtp_type.h	/^	unsigned char sendto[32][128];  \/\/no greater than 32 user$/;"	m	struct:mail_data_type
+sendto_num	smtp_type.h	/^	int sendto_num; \/\/<=32$/;"	m	struct:mail_data_type
+server_ip	smtp_type.h	/^	int server_ip;$/;"	m	struct:config_info_type
+server_port	smtp_type.h	/^	unsigned short server_port;$/;"	m	struct:config_info_type
+smtp_reply_parser	smtpCap.cpp	/^void smtp_reply_parser(list<mail_data_type>::iterator it,char * buf,size_t size)$/;"	f
+smtp_request_parser	smtpCap.cpp	/^void smtp_request_parser(list<mail_data_type>::iterator it, char * buf,size_t size)$/;"	f
+smtp_request_state	smtp_type.h	/^	smtp_request_type smtp_request_state;$/;"	m	struct:mail_data_type
+smtp_request_type	smtp_type.h	/^enum smtp_request_type$/;"	g
+source_port	smtp_type.h	/^	unsigned short source_port;  \/\/dest port is fixed(25)   $/;"	m	struct:mail_data_type
+str	test_base64.c	/^unsigned char str[]={"ms347397173"};$/;"	v
+subject	smtp_type.h	/^	unsigned char subject[1024];$/;"	m	struct:mail_data_type
+tcp_callback	smtpCap.cpp	/^void tcp_callback(struct tcp_stream * a_tcp,void ** this_time_not_needed)$/;"	f
+test_decode	test_base64.c	/^void test_decode()$/;"	f
+test_encode	test_base64.c	/^void test_encode()$/;"	f
+thread_start	smtpCap.cpp	/^void * thread_start(void * arg)$/;"	f
+user_agent	smtp_type.h	/^	unsigned char user_agent[64];$/;"	m	struct:mail_data_type
+username	smtp_type.h	/^	unsigned char username[128];  $/;"	m	struct:mail_data_type
+
+--------------321FB7DF846DC74396362911--
+.

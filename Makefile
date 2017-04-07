@@ -10,7 +10,9 @@ DEBUG=-g
 NIDSLIB=-lnids
 NETLIB=-lnet
 PCAPLIB=-lpcap
-LIBS=$(NIDSLIB) $(NETLIB) $(PCAPLIB) -lnsl -lgthread-2.0 $(BASE64) $(TEXTTOOLS)
+CURLLIB=-lcurl
+NSLLIB=-lnsl
+LIBS=$(NIDSLIB) $(NETLIB) $(PCAPLIB) $(NSLLIB) $(CURLLIB) -lgthread-2.0 $(BASE64) $(TEXTTOOLS)
 
 
 all:smtpCap

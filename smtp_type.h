@@ -81,4 +81,5 @@ typedef struct config_info_type
 	int server_ip;
 	unsigned short server_port;
 	char eml_path[256];
+	char ftp_url[256];
 }config_info_type;

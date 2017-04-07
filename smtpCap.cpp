@@ -23,6 +23,9 @@
 
 #include"text_tools.h"  //use text tools function
 
+#include<curl/curl.h>  //use libcurl for ftp transfer
+#include<sys/stat.h>
+#include<errno.h>
 #include<pthread.h>
 #include<unistd.h>
 #include<sys/types.h>
@@ -190,7 +193,6 @@ void user_agent_parser(list<mail_data_type >::iterator it,unsigned char * buf,si
 	}
 }
 
-
 /*************************************************************************************
  * Summary: get mail content ,save to eml file 
  * Param:
@@ -353,6 +355,12 @@ int read_config_file()
 	fscanf(fp,"%s",buf);
 	if(strncmp(buf,"server_ip:",10)==0)
 	{
+		//set ftp url
+		strcpy(g_config_info.ftp_url,"ftp://");
+		strcat(g_config_info.ftp_url,buf+10);
+		strcat(g_config_info.ftp_url,"/");
+
+		//set server ip
 		inet_pton(AF_INET,buf+10,&g_config_info.server_ip);
 	}
 	else
@@ -385,10 +393,127 @@ int read_config_file()
 		return -1;
 	}
 
-
-
 	fclose(fp);
 	return 0;
+}
+
+/*********************************************
+ * Summary:read file callback for ftp upload 
+ *********************************************/
+size_t read_callback(void * ptr,size_t size,size_t nmemb,void * stream)
+{
+	curl_off_t nread;
+	size_t ret_num=fread(ptr,size,nmemb,(FILE *)stream);
+	nread=(curl_off_t)ret_num;
+	fprintf(stderr, "*** We read %" CURL_FORMAT_CURL_OFF_T
+					" bytes from file\n", nread);
+
+	return ret_num;
+}
+
+/***************************************************************
+ * Summary: transfer eml file via ftp
+ * Param:
+ *		eml_file_path:eml file's path
+ ***************************************************************/
+#define REMOTE_URL "ftp://192.168.140.1/log.txt"
+void send_eml_file_to_server(char * eml_file_path,char * new_eml_file_name)
+{
+	CURL  * curl;
+	FILE * fp=NULL;
+	CURLcode res;
+	curl_off_t fsize;
+	struct stat file_info;
+	struct curl_slist* headerlist=NULL;
+	char remote_url[256]={0};
+	strcpy(remote_url,g_config_info.ftp_url);
+	strcat(remote_url,new_eml_file_name);
+
+	/* get the file size of the local file */ 
+	if(stat(eml_file_path, &file_info)) 
+	{
+		printf("Couldnt open '%s': %s\n", eml_file_path, strerror(errno));
+		return ;
+	}
+	fsize = (curl_off_t)file_info.st_size;
+	printf("Local file size: %" CURL_FORMAT_CURL_OFF_T " bytes.\n", fsize);
+
+	fp=fopen(eml_file_path,"rb");
+	if(!fp)
+	{
+		printf("open file faild\n");
+		return ;
+	}
+
+	/* In windows, this will init the winsock stuff */ 
+	curl_global_init(CURL_GLOBAL_ALL);
+	   
+	//easy init
+	curl=curl_easy_init();
+	if(!curl)
+	{
+		perror("curl init failed\n");
+		return ;
+	}
+
+	curl_easy_setopt(curl,CURLOPT_READFUNCTION,read_callback);
+	
+	curl_easy_setopt(curl, CURLOPT_UPLOAD, 1L);
+	
+	curl_easy_setopt(curl, CURLOPT_URL, remote_url);
+	curl_easy_setopt(curl, CURLOPT_READDATA, fp);
+	curl_easy_setopt(curl, CURLOPT_INFILESIZE_LARGE,(curl_off_t)fsize);
+	res = curl_easy_perform(curl);
+	if(res!=CURLE_OK)
+	{
+		printf("curl_easy_perform() failed: %s\n",curl_easy_strerror(res));
+	}
+
+    fclose(fp); /* close the local file */ 
+    curl_global_cleanup();
+
+
+
+	__TRACE__("send eml file successed !\n");
+}
+
+/***************************************************************
+ * Summary:send data struct(mail_data_type) to server via socket
+ * Param:
+ *		buf:data struct's address
+ *		size:buf's size
+ ***************************************************************/
+int send_data_to_server(void * buf,size_t size)
+{
+	struct sockaddr_in server_address;
+	memset(&server_address,0,sizeof(server_address));
+	server_address.sin_family=AF_INET;
+	server_address.sin_addr.s_addr=g_config_info.server_ip;
+	server_address.sin_port=g_config_info.server_port;
+
+	int sock=socket(PF_INET,SOCK_STREAM,0);
+	if(sock<0)
+	{
+		return 1;
+	}
+
+	if(connect(sock,(struct sockaddr *)&server_address,sizeof(server_address))<0)
+	{
+		__TRACE__("connection failed!\n");
+		close(sock);
+		return 2;
+	}
+	
+	int ret=send(sock,buf,size,0);
+	if(ret<=0)
+	{
+		close(sock);
+		return 3;
+	}
+	__TRACE__("send data success\n");
+
+	close(sock);
+
 }
 
 /*****************************************************************
@@ -399,48 +524,29 @@ int read_config_file()
  *****************************************************************/
 void * thread_start(void * arg)
 {
-	mail_data_type * data= (mail_data_type *)arg;
-	
-	//sock conn
-	struct sockaddr_in server_address;
-	memset(&server_address,0,sizeof(server_address));
-	server_address.sin_family=AF_INET;
-	server_address.sin_addr.s_addr=g_config_info.server_ip;
-	server_address.sin_port=g_config_info.server_port;
+	//send data
+	mail_data_type * p_data= (mail_data_type *)arg;	
+	send_data_to_server(p_data,sizeof(mail_data_type));
 
-	int sock=socket(PF_INET,SOCK_STREAM,0);
-	if(sock<0)
-	{
-		exit(1);
-	}
+	//send eml file via ftp
+	char eml_file_path[256]={0};
+	strcpy(eml_file_path,g_config_info.eml_path);
+	strcat(eml_file_path,(char *)p_data->eml_file_name);
+	//call function
+	send_eml_file_to_server(eml_file_path,(char *)p_data->eml_file_name);
+	//send eml file end
 
-	if(connect(sock,(struct sockaddr *)&server_address,sizeof(server_address))<0)
-	{
-		__TRACE__("connection failed!\n");
-		close(sock);
-		exit(2);
-	}
-	
-	int ret=send(sock,data,sizeof(mail_data_type ),0);
-	if(ret<=0)
-	{
-		close(sock);
-		exit(3);
-	}
-	__TRACE__("send success\n");
-
-	close(sock);
 }
 
 /**************************************************
- * Summary:send object to server
+ * Summary:send object & eml file to server
  * Param:
  *		it:list's iterator
  * Return:
  *		0:SUCCESS
  *		-1:Failed
  *************************************************/
-int send_data_to_server(list<mail_data_type >::iterator it)
+int send_info_to_server(list<mail_data_type >::iterator it)
 {
 
 	int ret;
@@ -597,7 +703,7 @@ void tcp_callback(struct tcp_stream * a_tcp,void ** this_time_not_needed)
 		//send object to server
         if(it!=g_mail_info_list.end())
 		{
-			send_data_to_server(it);
+			send_info_to_server(it);
 		}
 		//delete object from list
 		g_mail_info_list.erase(it);

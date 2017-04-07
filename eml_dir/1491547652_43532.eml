@@ -1,0 +1,61 @@
+To: ms347397173@hotmail.com
+From: m <ms347397173@sina.com>
+Subject: 3
+Message-ID: <da69fea4-1446-d57e-eda9-f8bf324aaf29@sina.com>
+Date: Thu, 6 Apr 2017 23:47:32 -0700
+User-Agent: Mozilla/5.0 (X11; Linux i686; rv:45.0) Gecko/20100101
+ Thunderbird/45.8.0
+MIME-Version: 1.0
+Content-Type: multipart/mixed;
+ boundary="------------1737FE2399572CDBB9BEF273"
+
+This is a multi-part message in MIME format.
+--------------1737FE2399572CDBB9BEF273
+Content-Type: text/plain; charset=gbk; format=flowed
+Content-Transfer-Encoding: 7bit
+
+3
+
+
+--------------1737FE2399572CDBB9BEF273
+Content-Type: text/plain; charset=UTF-8;
+ name="Makefile"
+Content-Transfer-Encoding: 7bit
+Content-Disposition: attachment;
+ filename="Makefile"
+
+NO_WARN=-Wall
+CC=g++
+
+BASE64=base64.c
+TEXTTOOLS=text_tools.c
+
+
+DEBUG=-g
+
+NIDSLIB=-lnids
+NETLIB=-lnet
+PCAPLIB=-lpcap
+CURLLIB=-lcurl
+NSLLIB=-lnsl
+LIBS=$(NIDSLIB) $(NETLIB) $(PCAPLIB) $(NSLLIB) $(CURLLIB) -lgthread-2.0 $(BASE64) $(TEXTTOOLS)
+
+
+all:smtpCap
+
+debug:smtpCap.cpp
+	$(CC) $(DEBUG) $(NO_WARN) -o smtpCap $^ $(LIBS)
+
+smtpCap:smtpCap.cpp
+	$(CC) $(NO_WARN) -o $@ $^ $(LIBS)
+
+base64:test_base64
+
+test_base64:test_base64.c
+	$(CC) $(NO_WARN) -o $@ $^ $(BASE64)
+
+clean:
+	rm -f smtpCap test_base64
+
+--------------1737FE2399572CDBB9BEF273--
+.
