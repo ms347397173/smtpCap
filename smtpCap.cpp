@@ -4,26 +4,27 @@
  *Date: 2017/3/11
  *
  *************************************************/
+#include<stdio.h>
+#include<stdlib.h>
+#include<string.h>
+#include<list>
+using namespace std;
 #define __DEBUG__  //use __TRACE__ macro
 #include"Trace.h"
 
-#define __LINUX_PLATFORM__
-
-#ifdef __LINUX_PLATFORM__
-#define SEPARATOR '/'
-#endif
-#ifdef __WINDOWS_PLATFORM__
-#define SEPARATOR '\\'   //windows
-#endif
-
+//#define __LINUX_PLATFORM__ 
+#define __WINDOWS_PLATFORM__
 
 #include"smtp_type.h"
-
 #include"base64.h"  //use base64 decode
-
 #include"text_tools.h"  //use text tools function
+#include<stdio.h>
+#include<stdlib.h>
+#include<string.h>
+#include<list>
+using namespace std;
 
-#include<curl/curl.h>  //use libcurl for ftp transfer
+#ifdef __LINUX_PLATFORM__
 #include<sys/stat.h>
 #include<errno.h>
 #include<pthread.h>
@@ -32,12 +33,17 @@
 #include<sys/socket.h>
 #include<netinet/in.h>
 #include<arpa/inet.h>
-#include<stdio.h>
 #include<nids.h>
-#include<stdlib.h>
-#include<string.h>
-#include<list>
-using namespace std;
+#include<curl/curl.h>  //use libcurl for ftp transfer
+#endif
+
+#ifdef __WINDOWS_PLATFORM__
+#include"nids.h"
+//link libnids dll libary
+#include<winsock2.h>
+#pragma comment(lib, "ws2_32.lib")
+#endif
+
 
 //funciton statement
 int read_config_file();
@@ -485,6 +491,7 @@ void send_eml_file_to_server(char * eml_file_path,char * new_eml_file_name)
  ***************************************************************/
 int send_data_to_server(void * buf,size_t size)
 {
+#ifdef __LINUX_PLATFORM__
 	struct sockaddr_in server_address;
 	memset(&server_address,0,sizeof(server_address));
 	server_address.sin_family=AF_INET;
@@ -510,9 +517,45 @@ int send_data_to_server(void * buf,size_t size)
 		close(sock);
 		return 3;
 	}
-	__TRACE__("send data success\n");
-
 	close(sock);
+#endif
+
+#ifdef __WINDOWS_PLATFORM__
+	WORD wVersionRequested;  //typedef unsigned short WORD
+	WSADATA wsaData;   //用阿里存储系统传回的关于WinSocket的资料
+	int err;  //用来判断启动函数是否正常
+	wVersionRequested = MAKEWORD(1, 1);
+	err = WSAStartup(wVersionRequested, &wsaData);
+	if (err != 0)
+	{
+		return 1;
+	}
+	if (LOBYTE(wsaData.wVersion) != 1 || HIBYTE(wsaData.wVersion) != 1)
+	{
+		WSACleanup();
+		return 1;
+	}							
+	SOCKET socketClient = socket(AF_INET, SOCK_STREAM, 0);
+	
+	SOCKADDR_IN addrSrv;  //服务器的地址
+	addrSrv.sin_addr.S_un.S_addr = g_config_info.server_ip;
+	addrSrv.sin_family = AF_INET;  //使用的是TCP/IP 
+	addrSrv.sin_port = g_config_info.server_port;  //转为网络序  设置端口号
+	if (connect(socketClient, (SOCKADDR*)&addrSrv, sizeof(SOCKADDR)) < 0)  //协议参数  套接字参数 
+	{
+		printf("connction faild!\n");
+		closesocket(socketClient);
+		return 2;
+	}
+	int ret=send(socketClient,buf,size,0);
+	if(ret<=0)
+	{
+		closesocket(socketClient);
+		return 3;
+	}
+	closesocket(socketClient);
+#endif
+	__TRACE__("send data success\n");
 
 }
 
@@ -548,7 +591,7 @@ void * thread_start(void * arg)
  *************************************************/
 int send_info_to_server(list<mail_data_type >::iterator it)
 {
-
+#ifdef __LINUX_PLATFORM__
 	int ret;
 	pthread_t tid;
 	if(it!=g_mail_info_list.end())
@@ -563,6 +606,7 @@ int send_info_to_server(list<mail_data_type >::iterator it)
 	}
 
 	return 0;
+#endif
 }
 /************************************************************
  *  Summary: analyze sended smtp packet from buffer
@@ -650,8 +694,6 @@ void smtp_reply_parser(list<mail_data_type >::iterator it,char * buf,size_t size
 //call back function
 void tcp_callback(struct tcp_stream * a_tcp,void ** this_time_not_needed)
 {
-	char buf[1024];
-
 	//connecting
 	if(a_tcp->nids_state == NIDS_JUST_EST)
 	{
@@ -659,13 +701,12 @@ void tcp_callback(struct tcp_stream * a_tcp,void ** this_time_not_needed)
 		if(a_tcp->addr.dest == 25)
 		{
 		    //received a client and server 
-		    strcpy(buf,adres(a_tcp->addr));  //get tcp connection addr info to buf
 			a_tcp->client.collect++;
 			a_tcp->server.collect++;
 			a_tcp->server.collect_urg++;
 			a_tcp->client.collect_urg++;
 
-			__TRACE__("%s mail transport established\n",buf);
+			__TRACE__("mail transport established\n");
 
 			//create a object in list recording source port
 			g_mail_info_list.resize(g_mail_info_list.size()+1);
@@ -690,7 +731,6 @@ void tcp_callback(struct tcp_stream * a_tcp,void ** this_time_not_needed)
 	// connection has been closed 
 	if(a_tcp->nids_state == NIDS_CLOSE)
 	{
-		__TRACE__("%s closeing\n",buf);
 	
 	    a_tcp->client.collect--;
 	    a_tcp->server.collect--;
@@ -700,7 +740,9 @@ void tcp_callback(struct tcp_stream * a_tcp,void ** this_time_not_needed)
 		//find object
 		list<mail_data_type >::iterator it=find_element_from_list(a_tcp->addr.source);
 		
-		//send object to server
+		__TRACE__("%s %d closeing\n",it->hostname,it->source_port);
+		
+	//send object to server
         if(it!=g_mail_info_list.end())
 		{
 			send_info_to_server(it);
@@ -714,7 +756,6 @@ void tcp_callback(struct tcp_stream * a_tcp,void ** this_time_not_needed)
     // connection has been closed by RST
 	if (a_tcp->nids_state == NIDS_RESET)
     {
-        __TRACE__( "%s reset\n", buf);
 
 	    a_tcp->client.collect--;
 	    a_tcp->server.collect--;
@@ -723,6 +764,7 @@ void tcp_callback(struct tcp_stream * a_tcp,void ** this_time_not_needed)
 
 		//delete object from list
 		list<mail_data_type >::iterator it=find_element_from_list(a_tcp->addr.source);
+        __TRACE__( "%s %d reset\n", it->hostname,it->source_port);
 		g_mail_info_list.erase(it);
 
 		return;
@@ -772,12 +814,13 @@ int main()
 	{
 		return -1;
 	}
-
+#ifdef __LINUX_PLATFORM__
 	in_addr addr;
 	addr.s_addr=g_config_info.server_ip;
 	unsigned short port;
 	port=g_config_info.server_port;
 	__TRACE__("server ip:%s\tserver port:%d\n",inet_ntoa(addr),ntohs(port));
+#endif
 
 	nids_params.device="eth1";
 
