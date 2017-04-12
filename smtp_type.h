@@ -66,7 +66,7 @@ typedef struct mail_data_type
 	//DATA
 	unsigned char subject[1024];
 	unsigned char date[64];
-	unsigned char user_agent[64];
+	unsigned char user_agent[256];
 	unsigned char attachment_name[16][128]; 
 	int attachment_num;  //<=16
 

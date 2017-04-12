@@ -192,3 +192,38 @@ char * jump_nonprintable_chars(char * buf,size_t size)
 	return NULL;
 
 }
+/****************************************************************************
+ * Summary: acording to key to get value from buf
+ * Param:
+ *		buf:src string
+ *		size:buf's size
+ *		key:key string
+ *		value:value string of output param
+ *		spacer:this char is spacer
+ * Return:
+ *		true:get value success
+ *		false:no get value
+ *
+ ****************************************************************************/
+bool read_config(char * buf,size_t size,char * key,__OUT_PARAM__ char * value,char spacer)
+{
+	char * res=strstr(buf,key);
+	if(res==NULL)
+	{
+		return false;
+	}
+	else //have key
+	{
+		int nums=find_char((unsigned char *)res,size-(res-buf),(unsigned char)spacer);
+		res+=(nums+1);  //+1 is because jump ':'
+		int ret=get_line((unsigned char *)res,size-(res-buf),(unsigned char *)value);
+		if(ret==-1)
+		{
+			return false;
+		}
+		else
+		{
+			return true;
+		}
+	}
+}

@@ -153,6 +153,10 @@ void data_parser(list<mail_data_type >::iterator it,unsigned char * buf,size_t s
 	//search subject/date/user-agent/main_body
 	for(int i=SUBJECT;i<=MAIN_BODY;++i)
 	{
+		if(i==DATE)   //date将从time()函数处获得，此处省略解析
+		{
+			continue;
+		}
 		DATA_tables[i](it,buf,size);
 	}
 }
@@ -222,6 +226,7 @@ void save_data_to_file(FILE * fp, unsigned char * buf,size_t size)
  ****************************************************************************************/
 void main_body_parser(list<mail_data_type >::iterator it,unsigned char * buf,size_t size)
 {
+	it->data_state=MAIN_BODY;  //set state
 	FILE* fp=NULL;
 
 	char file_path[256]={0};
@@ -338,41 +343,6 @@ list<mail_data_type >::iterator find_element_from_list(unsigned short source_por
 	return it;
 }
 
-/****************************************************************************
- * Summary: acording to key to get value from buf
- * Param:
- *		buf:src string
- *		size:buf's size
- *		key:key string
- *		value:value string of output param
- *		spacer:this char is spacer
- * Return:
- *		true:get value success
- *		false:no get value
- *
- ****************************************************************************/
-bool read_config(char * buf,size_t size,char * key,__OUT_PARAM__ char * value,char spacer)
-{
-	char * res=strstr(buf,key);
-	if(res==NULL)
-	{
-		return false;
-	}
-	else //have key
-	{
-		int nums=find_char((unsigned char *)res,size-(res-buf),(unsigned char)spacer);
-		res+=(nums+1);  //+1 is because jump ':'
-		int ret=get_line((unsigned char *)res,size-(res-buf),(unsigned char *)value);
-		if(ret==-1)
-		{
-			return false;
-		}
-		else
-		{
-			return true;
-		}
-	}
-}
 
 /************************************************
  *Summary:read smtpCap.config
@@ -748,7 +718,16 @@ void tcp_callback(struct tcp_stream * a_tcp,void ** this_time_not_needed)
 
 			//determine new eml file
 			char filename[64]={0};
-			sprintf(filename,"%d",time(NULL));
+
+
+			//get date
+			struct tm *t;
+			time_t timer=time(NULL);
+			t = localtime(&timer);
+			sprintf((char *)end.date,"%4d-%02d-%02d %02d:%02d:%02d",t->tm_year+1900,t->tm_mon+1,t->tm_mday,t->tm_hour,t->tm_min,t->tm_sec);
+
+			//get eml_file 
+			sprintf(filename,"%d",timer);
 			filename[strlen(filename)]='_';
 			sprintf(filename+strlen(filename),"%d",(int)end.source_port);
 			strcat(filename,".eml");

@@ -19,3 +19,5 @@ unsigned char * read_info(unsigned char * buf,size_t size,unsigned char * key_st
 char * jump_nonprintable_chars(char * buf,size_t size);
 
 char * jump_all_field(char * buf);
+
+bool read_config(char * buf,size_t size,char * key,__OUT_PARAM__ char * value,char spacer);
