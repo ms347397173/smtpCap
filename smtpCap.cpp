@@ -12,8 +12,7 @@ using namespace std;
 #define __DEBUG__  //use __TRACE__ macro
 #include"Trace.h"
 
-//#define __LINUX_PLATFORM__ 
-#define __WINDOWS_PLATFORM__
+#define __LINUX_PLATFORM__ //#define __WINDOWS_PLATFORM__
 
 #include"smtp_type.h"
 #include"base64.h"  //use base64 decode
@@ -339,6 +338,42 @@ list<mail_data_type >::iterator find_element_from_list(unsigned short source_por
 	return it;
 }
 
+/****************************************************************************
+ * Summary: acording to key to get value from buf
+ * Param:
+ *		buf:src string
+ *		size:buf's size
+ *		key:key string
+ *		value:value string of output param
+ *		spacer:this char is spacer
+ * Return:
+ *		true:get value success
+ *		false:no get value
+ *
+ ****************************************************************************/
+bool read_config(char * buf,size_t size,char * key,__OUT_PARAM__ char * value,char spacer)
+{
+	char * res=strstr(buf,key);
+	if(res==NULL)
+	{
+		return false;
+	}
+	else //have key
+	{
+		int nums=find_char((unsigned char *)res,size-(res-buf),(unsigned char)spacer);
+		res+=(nums+1);  //+1 is because jump ':'
+		int ret=get_line((unsigned char *)res,size-(res-buf),(unsigned char *)value);
+		if(ret==-1)
+		{
+			return false;
+		}
+		else
+		{
+			return true;
+		}
+	}
+}
+
 /************************************************
  *Summary:read smtpCap.config
  *Return:
@@ -348,58 +383,52 @@ list<mail_data_type >::iterator find_element_from_list(unsigned short source_por
  ************************************************/
 int read_config_file()
 {
+	//get file size
+	struct stat file_info;
+	int fsize=0;
+	if(stat("smtpCap.config", &file_info)) 
+	{
+		printf("Couldnt open '%s': %s\n", "smtpCap.config", strerror(errno));
+		return -1;
+	}
+	fsize = (curl_off_t)file_info.st_size;
+	
 	FILE* fp=NULL;
-	char buf[64];
+	char* buf=(char *)malloc(fsize);
+	if(buf==NULL)
+	{
+		free(buf);
+		return -1;
+	}
 	fp=fopen("smtpCap.config","r");
 	if(!fp)
 	{
+		free(buf);
 		return -1;
 	}
+
+	int size=fread(buf,1,fsize,fp);
+	char spacer=':';
 
 	//read server ip
-	memset(buf,0,64);
-	fscanf(fp,"%s",buf);
-	if(strncmp(buf,"server_ip:",10)==0)
-	{
-		//set ftp url
-		strcpy(g_config_info.ftp_url,"ftp://");
-		strcat(g_config_info.ftp_url,buf+10);
-		strcat(g_config_info.ftp_url,"/");
+	char server_ip[16]={0};
+	read_config(buf,size,"server_ip",server_ip,spacer);
+	inet_pton(AF_INET,server_ip,&g_config_info.server_ip);
 
-		//set server ip
-		inet_pton(AF_INET,buf+10,&g_config_info.server_ip);
-	}
-	else
-	{
-		fclose(fp);
-		return -1;
-	}
+	//set ftp url
+	strcpy(g_config_info.ftp_url,"ftp://");
+	strcat(g_config_info.ftp_url,server_ip);
+	strcat(g_config_info.ftp_url,"/");
+	
 	//read server port
-	memset(buf,0,64);
-	fscanf(fp,"%s",buf);
-	if(strncmp(buf,"server_port:",12)==0)
-	{
-		g_config_info.server_port=htons((unsigned short)atoi(buf+12));
-	}
-	else
-	{
-		fclose(fp);
-		return -1;
-	}
+	char server_port[6];
+	read_config(buf,size,"server_port",server_port,spacer);
+	g_config_info.server_port=htons((unsigned short)atoi(server_port));
 
-	memset(buf,0,64);
-	fscanf(fp,"%s",buf);
-	if(strncmp(buf,"eml_path:",9)==0)
-	{
-		strcpy(g_config_info.eml_path,buf+9);
-	}
-	else
-	{
-		fclose(fp);
-		return -1;
-	}
+	read_config(buf,size,"eml_path",g_config_info.eml_path,spacer);
 
 	fclose(fp);
+	free(buf);
 	return 0;
 }
 
