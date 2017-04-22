@@ -173,14 +173,84 @@ void rset_parser(list<mail_data_type >::iterator it,unsigned char * buf,size_t s
 /*DATA parser function */
 void subject_parser(list<mail_data_type >::iterator it,unsigned char * buf,size_t size)
 {
-	char * subject_str="Subject";
-	unsigned char* ret_str=read_info((unsigned char *)buf,size,(unsigned char*)subject_str,it->subject);
+	char * subject_field="Subject";
+	char subject_str[256]={0};
+	char char_type[10]={0};  //utf-8 gb2312 ...
+	char encode_subject[256]={0};
+	unsigned char* ret_str=read_info((unsigned char *)buf,size,(unsigned char*)subject_field,(unsigned char *)subject_str);
 	if(ret_str)
 	{
+		//set state
 		it->data_state=SUBJECT;
+		//if the subject is non english, the subject need decode
+		int str_len=strlen(subject_str);
+		if(subject_str[0]=='=')
+		{
+			char * position=subject_str+2;  //jump = and ?
+			int index=find_char((unsigned char *)position,str_len-(position-subject_str),'?');
+			if(index!=-1)
+			{
+				strncpy(char_type,position,index);
+				__TRACE__("charset type:%s\n",char_type);
+				position+=(index+1);
+			}
+			else
+			{
+				__TRACE__("decode failed\n");
+				return ;
+			}
+			index=find_char((unsigned char *)position,str_len-(position-subject_str),'?');
+			if(index!=-1)
+			{
+				position+=(index+1);
+				__TRACE__("INDEX:%d\n",index);
+				// B?
+			}
+			else
+			{
+				__TRACE__("decode failed\n");
+				return;
+			}
+
+			//get subject data
+			index=find_char((unsigned char *)position,str_len-(position-subject_str),'?');
+			if(index!=-1)
+			{
+				__TRACE__("encode data:%s\n",position);
+
+				base64_decode((unsigned char *)encode_subject,(unsigned char *)position,index);
+				
+				//to UTF8
+				if(strncasecmp(char_type,"utf-8",index)==0)
+				{
+					strcpy((char *)it->subject,encode_subject);
+				}
+				else if(strncasecmp(char_type,"gb2312",index)==0)
+				{
+					//to utf 8
+					code_convert("gb2312","utf-8",encode_subject,index,(char *)it->subject,256);
+				}
+				else if(strncasecmp(char_type,"utf-16",index)==0)
+				{
+					//to utf-8
+					code_convert("gb2312","utf-16",encode_subject,index,(char *)it->subject,256);
+				}
+			}
+			else
+			{
+				__TRACE__("decode failed\n");
+				return ;
+			}
+		}
+		else  //no need decode
+		{
+			strcpy((char *)it->subject,subject_str);
+		}
 		__TRACE__("Subject:%s\n",it->subject);
 	}
 }
+
+/* the function is not used , because program use time() function */
 void date_parser(list<mail_data_type >::iterator it,unsigned char * buf,size_t size)
 {
 	char * date_str="Date";

@@ -2,6 +2,7 @@
 #include<stddef.h>
 #include<string.h>
 #include<malloc.h>
+#include<iconv.h>
 #ifndef __OUT_PARAM__
 #define __OUT_PARAM__
 #endif
@@ -226,4 +227,19 @@ bool read_config(char * buf,size_t size,char * key,__OUT_PARAM__ char * value,ch
 			return true;
 		}
 	}
+}
+
+int code_convert(char *from_charset,char *to_charset,char *inbuf,size_t inlen,char *outbuf,size_t outlen)
+{
+	iconv_t cd;
+	int rc;
+	char **pin = &inbuf;
+	char **pout = &outbuf;
+
+	cd = iconv_open(to_charset,from_charset);
+	if (cd==0) return -1;
+	memset(outbuf,0,outlen);
+	if (iconv(cd,pin,&inlen,pout,&outlen)==-1) return -1;
+	iconv_close(cd);
+	return 0;
 }

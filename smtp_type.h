@@ -38,6 +38,19 @@ enum smtp_reply_type
 }smtp_reply_state;
 
 */
+
+enum subject_charset_type
+{
+	UNKNOWN_CHARSET, 
+	ASCII,
+
+	UTF8,
+	UTF16,
+	UTF32,
+	GB2312,
+};
+
+
 //these array's size should reconsider,its too long now
 // no mem align
 typedef struct mail_data_type
@@ -64,7 +77,9 @@ typedef struct mail_data_type
 	
 	int sendto_num; //<=32
 	//DATA
-	unsigned char subject[1024];
+	unsigned char subject[256];  //UTF-8 charset
+	//enum subject_charset_type subject_charset;
+
 	unsigned char date[64];
 	unsigned char user_agent[256];
 	unsigned char attachment_name[16][128]; 
