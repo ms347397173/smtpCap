@@ -23,3 +23,5 @@ char * jump_all_field(char * buf);
 bool read_config(char * buf,size_t size,char * key,__OUT_PARAM__ char * value,char spacer);
 
 int code_convert(char *from_charset,char *to_charset,char *inbuf,size_t inlen,char *outbuf,size_t outlen);
+
+int read_a_word(unsigned char * buf,size_t size);

@@ -63,56 +63,103 @@ void ehlo_parser(list<mail_data_type >::iterator it,unsigned char * buf,size_t s
 	__TRACE__("hostname:%s\n",it->hostname);
 }
 
+/*****************************************************************
+ * Summary: parse password and username for the method of PALIN
+ *
+ *
+ * ***************************************************************/
+void parse_username_and_password(list<mail_data_type>::iterator it,unsigned char* buf,size_t size)
+{
+	int word_size=read_a_word(buf,size);
+	if(word_size<=0||word_size>128)
+		return;
+	//decode
+	unsigned char decoded_username_and_passwd[128]={0};
+	base64_decode(decoded_username_and_passwd,buf,word_size);
+				
+	unsigned char * start_point=decoded_username_and_passwd+1; //this reason is what decoded_username_and_passwd's first char is '\0'
+
+	word_size=read_a_word(start_point,127);
+	memcpy(it->username,start_point,word_size);
+	it->username[size]='\0';
+	__TRACE__("username:%s\n",it->username);
+
+	strcpy((char *)it->password,(char *)start_point+word_size+1);  //jump username and '\0'
+	__TRACE__("password:%s\n",it->password);
+
+}
+
+
 //the function process auth type is "auth:plain "
 void auth_parser(list<mail_data_type >::iterator it,unsigned char * buf,size_t size)
 {
-	unsigned char auth_buf[128]={0};
-	int length=get_line(buf,size,auth_buf);
+	unsigned char * p=buf;
 	
-	//get auth type
-	int blank_index=find_char(auth_buf,length,' ');
-	
-	if(blank_index!=-1)
+	if(strncasecmp((char*)buf,"AUTH",strlen("AUTH"))==0)  //this packet have command word
 	{
-		memcpy(it->auth_type,auth_buf,blank_index);
-		it->auth_type[blank_index]='\0';
-		__TRACE__("auth type:%s\n",it->auth_type);
-	}
+		p+=5; //jump "AUTH "
 
-	int up_size=length-blank_index-1; //username and passwd
-	//get user name
-	unsigned char encoded_username_and_passwd[128]={0};
-	memcpy(encoded_username_and_passwd,auth_buf+blank_index+1,up_size);
-	encoded_username_and_passwd[up_size]='\0';
+		//get auth type
+		int word_size=read_a_word(p,size-(p-buf));
+		if(word_size!=0)
+		{
+			memcpy(it->auth_type,p,word_size);
+			it->auth_type[word_size]='\0';
+			__TRACE__("auth type:%s\n",it->auth_type);
+		}
+
+		p+=word_size;
+
+		if(strcasecmp((char *)it->auth_type,"PLAIN")==0)
+		{
+			if(*p==' ')  //Follow-up data
+			{
+				p+=1;
+				parse_username_and_password(it,p,size-(p-buf));
+			}
+		}
+	
 		
-	//decode
-	unsigned char decoded_username_and_passwd[128]={0};
-	base64_decode(decoded_username_and_passwd,encoded_username_and_passwd,up_size);
-
-	unsigned char * start_point=decoded_username_and_passwd+1; //this reason is what decoded_username_and_passwd's first char is '\0'
-
-	//find '\0'
-	int zero_index=find_char(start_point,up_size*3/4+1,'\0');
-	if(zero_index==-1)
-	{
-		return;
 	}
-
-	memcpy(it->username,start_point,zero_index);
-	it->username[zero_index]='\0';
-	__TRACE__("username:%s\n",it->username);
-
-	strcpy((char *)it->password,(char *)start_point+zero_index+1);  //jump username and '\0'
-	__TRACE__("password:%s\n",it->password);
-
+	else  //no command word
+	{
+		if(strcasecmp((char *)it->auth_type,"PLAIN")==0)
+		{
+			parse_username_and_password(it,buf,size);
+		}
+		else if(strcasecmp((char *)it->auth_type,"LOGIN")==0)
+		{
+			unsigned char encoded[128]={0};
+			int word_size=read_a_word(p,size);
+			if(strlen((char *)it->username)==0)
+			{
+				base64_decode(it->username,p,word_size);
+				__TRACE__("username:%s\n",it->username);
+			}
+			else
+			{
+				base64_decode(it->password,p,word_size);
+				__TRACE__("password:%s\n",it->password);
+			}
+		}
+		else
+		{
+			return;
+		}
+	}
 }
 void mail_parser(list<mail_data_type >::iterator it,unsigned char * buf,size_t size)
 {
 
 	//get from
 	//jump "FROM:<"
-	unsigned char *begin=buf+6;
-	int char_index=find_char(begin,size-5,'>');
+	//unsigned char *begin=buf+6;
+	//int char_index=find_char(begin,size-5,'>');
+
+	int char_index=find_char(buf,size,'<');
+	unsigned char *begin=buf+char_index+1;
+	char_index=find_char(begin,size-(char_index+1),'>');
+
 	if(char_index==-1)
 	{
 		__TRACE__("SEARCH CHAR FAILED\n");
@@ -126,8 +173,13 @@ void rcpt_parser(list<mail_data_type >::iterator it,unsigned char * buf,size_t s
 {
 	//get TO
 	//jump "To:<"
-	unsigned char *begin=buf+4;
-	int char_index=find_char(begin,size-4,'>');
+	//unsigned char *begin=buf+4;
+	//int char_index=find_char(begin,size-4,'>');
+	
+	int char_index=find_char(buf,size,'<');
+	unsigned char *begin=buf+char_index+1;
+	char_index=find_char(begin,size-(char_index+1),'>');
+	
 	if(char_index==-1)
 	{
 		__TRACE__("SEARCH CHAR FAILED\n");
@@ -489,7 +541,6 @@ size_t read_callback(void * ptr,size_t size,size_t nmemb,void * stream)
  * Param:
  *		eml_file_path:eml file's path
  ***************************************************************/
-#define REMOTE_URL "ftp://192.168.140.1/log.txt"
 void send_eml_file_to_server(char * eml_file_path,char * new_eml_file_name)
 {
 	CURL  * curl;
@@ -715,6 +766,8 @@ void smtp_request_parser(list<mail_data_type >::iterator it, char * buf,size_t s
 		smtp_request_tables[it->smtp_request_state](it,(unsigned char *)buf,size); 
 		return ;
 	}
+
+
 	else if(strcmp(command,"EHLO")==0)
 	{
 		it->smtp_request_state=EHLO;
@@ -741,7 +794,13 @@ void smtp_request_parser(list<mail_data_type >::iterator it, char * buf,size_t s
 	else
 	{
 		//no support
-		it->smtp_request_state=UNKOWN;
+		//it->smtp_request_state=UNKOWN;
+		//return;
+	}
+
+	if(it->smtp_request_state==AUTH)
+	{
+		smtp_request_tables[it->smtp_request_state](it,(unsigned char *)buf,size);  //use buf ,no use begin
 		return;
 	}
 
@@ -783,8 +842,10 @@ void tcp_callback(struct tcp_stream * a_tcp,void ** this_time_not_needed)
 			g_mail_info_list.resize(g_mail_info_list.size()+1);
 
 			mail_data_type& end=g_mail_info_list.back();
+
+			memset(&end,0,sizeof(mail_data_type));
+
 			end.source_port=a_tcp->addr.source;
-			end.sendto_num=0;
 			end.data_state=DATA_UNKOWN;
 			end.smtp_request_state=UNKOWN;
 

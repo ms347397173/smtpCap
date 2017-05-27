@@ -243,3 +243,14 @@ int code_convert(char *from_charset,char *to_charset,char *inbuf,size_t inlen,ch
 	iconv_close(cd);
 	return 0;
 }
+
+
+int read_a_word(unsigned char * buf,size_t size)
+{
+	unsigned char * p=buf;
+	while(size-- && *p && *p!=' ' && *p!='\t' && *p!='\r' && *p!='\n')
+	{
+		++p;
+	}
+	return p-buf;
+}
